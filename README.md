@@ -1,7 +1,7 @@
 # pSCT Alignment Control GUI
 Web GUI for pSCT mirror panel and actuator control. Built with D3.js, OPC UA, and websockets.
 
-The frontend implementation is based on the MVC (Model-View-Controller) pattern. The backend is implemented using a Python (Pyramid) webserver.
+The frontend implementation is based on the MVC (Model-View-Controller) pattern with D3.js and Bootstrap for visualization/styling. The backend is implemented using a Python (Pyramid) webserver with python-opcua and websockets.
 
 ## Dependencies/Packages
 
@@ -24,24 +24,35 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern.
 ## Features/To-Do
 
 - [ ] Frontend
-  - [ ] Errors
+  - [ ] History Logging
+    - [ ] History Log Model
+    - [ ] History Log View
+    - [ ] History Log Controller
+  - [ ] Error Handling
     - [ ] Error Log Model
     - [ ] Error Log View
     - [ ] Error Log Controller
     - [ ] Error popups/modals
       - [ ] Goto
-  - [ ] Components/Devices
-      - [ ] Device Tree Model
+  - [ ] Component/Device Monitoring
+      - [ ] Device/Device Tree Model 
+       - [ ] Telescope Model
+       - [ ] Mirror (Primary/Secondary) Model
+       - [ ] Panel (P1/P2/S1/S2) Model
+       - [ ] Actuator Model
+       - [ ] MPES Model
       - [ ] Info Box View
       - [ ] Device Tree Controller
       - [ ] Device Tree View (treeview)
   - [ ] Mirror View
-  - [ ] 
+  - [ ] Pointing
+  - [ ] Positioner
 - [ ] Backend
   - [ ] JSON message format definition
-    - [ ] 
-  - [ ]
-
+  - [ ] SubscriptionManager
+  - [ ] Login/Authentication
+    - [ ] MySQL backend
+    
 ## Known Issues/Troubleshooting
 
 ## References
