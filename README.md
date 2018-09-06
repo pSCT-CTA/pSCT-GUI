@@ -1,12 +1,12 @@
 # pSCT Alignment Control GUI
-Web GUI for pSCT mirror panel and actuator control. Built with D3.js, OPC UA, and websockets.
+Web GUI for pSCT mirror panel and actuator control. Built with D3.js, OPC UA, and gevent-socketio.
 
-The frontend implementation is based on the MVC (Model-View-Controller) pattern with D3.js and Bootstrap for visualization/styling. The backend is implemented using a Python (Pyramid) webserver with python-opcua and websockets.
+The frontend implementation is based on the MVC (Model-View-Controller) pattern with D3.js and Bootstrap for visualization/styling. The backend is implemented using a Python (Pyramid) webserver with python-opcua and the socket.io protocol.
 
 ## Dependencies/Packages
 
 * Python (backend)
-  * [websockets](https://github.com/aaugustin/websockets)
+  * [gevent-socketio](https://github.com/abourget/gevent-socketio)
   * [python-opcua](https://github.com/FreeOpcUa/python-opcua)
   * [Pyramid](https://github.com/Pylons/pyramid)
 * Javascript (frontend)
@@ -61,7 +61,7 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern 
   * [Paper 1](https://arxiv.org/abs/1608.03595)
   * [Paper 2](https://arxiv.org/abs/1710.07117)
 
-* Websockets Documentation: [https://websockets.readthedocs.io/en/stable/intro.html](https://websockets.readthedocs.io/en/stable/intro.html)
+* Websockets Documentation: [https://gevent-socketio.readthedocs.io/en/latest/](https://gevent-socketio.readthedocs.io/en/latest/)
 * Python OPC UA Documentation: [https://python-opcua.readthedocs.io/en/latest/](https://python-opcua.readthedocs.io/en/latest/)
 * Pyramid Web Framework Documentation: [https://docs.pylonsproject.org/projects/pyramid/en/latest/](https://docs.pylonsproject.org/projects/pyramid/en/latest/)
 
