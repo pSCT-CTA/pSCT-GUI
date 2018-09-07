@@ -61,7 +61,7 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern 
   * [Paper 1](https://arxiv.org/abs/1608.03595)
   * [Paper 2](https://arxiv.org/abs/1710.07117)
 
-* Websockets Documentation: [https://gevent-socketio.readthedocs.io/en/latest/](https://gevent-socketio.readthedocs.io/en/latest/)
+* Gevent-socketio Documentation: [https://gevent-socketio.readthedocs.io/en/latest/](https://gevent-socketio.readthedocs.io/en/latest/)
 * Python OPC UA Documentation: [https://python-opcua.readthedocs.io/en/latest/](https://python-opcua.readthedocs.io/en/latest/)
 * Pyramid Web Framework Documentation: [https://docs.pylonsproject.org/projects/pyramid/en/latest/](https://docs.pylonsproject.org/projects/pyramid/en/latest/)
 
