@@ -11,7 +11,7 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern 
   * [Pyramid](https://github.com/Pylons/pyramid)
 * Javascript (frontend)
   * [D3.js](https://github.com/d3/d3)
-  * [requireJS](https://github.com/requirejs/requirejs)
+  * [webpack](https://github.com/webpack/webpack)
   * [Bootstrap 4](https://github.com/twbs/bootstrap)
   * [jQuery](https://github.com/jquery/jquery)
   * [DataTables](https://github.com/DataTables/DataTables)
@@ -66,7 +66,7 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern 
 * Pyramid Web Framework Documentation: [https://docs.pylonsproject.org/projects/pyramid/en/latest/](https://docs.pylonsproject.org/projects/pyramid/en/latest/)
 
 * D3.js wiki: [https://github.com/d3/d3/wiki](https://github.com/d3/d3/wiki)
-* RequireJS Documentation: [https://requirejs.org/](https://requirejs.org/)
+* Webpack Documentation: [https://webpack.js.org/concepts/](https://webpack.js.org/concepts/)
 * Bootstrap 4 Documentation: [https://getbootstrap.com/docs/4.1/getting-started/introduction/](https://getbootstrap.com/docs/4.1/getting-started/introduction/)
 * jQuery Documentation: [https://api.jquery.com/](https://api.jquery.com/)
 * DataTables Documentation: [https://datatables.net/manual/](https://datatables.net/manual/)
