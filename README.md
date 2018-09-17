@@ -5,6 +5,7 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern 
 
 ## Dependencies/Packages
 
+* libevent 2.1.8
 * Python (backend)
   * [gevent-socketio](https://github.com/abourget/gevent-socketio)
   * [python-opcua](https://github.com/FreeOpcUa/python-opcua)
