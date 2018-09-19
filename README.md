@@ -1,13 +1,10 @@
 # pSCT Alignment Control GUI
-Web GUI for pSCT mirror panel and actuator control. Built with D3.js, OPC UA, and gevent-socketio.
-
-The frontend implementation is based on the MVC (Model-View-Controller) pattern with D3.js and Bootstrap for visualization/styling. The backend is implemented using a Python (Pyramid) webserver with python-opcua and the socket.io protocol.
+Web GUI for pSCT mirror panel alignment monitoring/control. Built with a Python backend using OPC UA, socket.io, gevent, and Pyramid. The frontend implementation is with D3.js, Bootstrap 4, and DataTables for visualization/styling.
 
 ## Dependencies/Packages
 
-* libevent 2.1.8
 * Python (backend)
-  * [gevent-socketio](https://github.com/abourget/gevent-socketio)
+  * [python-socketio](https://github.com/miguelgrinberg/python-socketio)
   * [python-opcua](https://github.com/FreeOpcUa/python-opcua)
   * [Pyramid](https://github.com/Pylons/pyramid)
 * Javascript (frontend)
@@ -17,43 +14,56 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern 
   * [jQuery](https://github.com/jquery/jquery)
   * [DataTables](https://github.com/DataTables/DataTables)
   * [Bootstrap-treeview](https://github.com/patternfly/patternfly-bootstrap-treeview)
+* Other
+  * libevent 2.1.8
 
 ## Installation and Setup
 
 **TODO**
 
-## Features/To-Do
+## Major Features/To Do:
 
-- [ ] Frontend
+ - [ ] Web server functionality
+    - [x] Base Pyramid server functionality (views)
+    - [ ] Gevent/greenlet server (using gunicorn)
+ - [ ] User Authentication/Management
+    - [x] Database support (local SQLite)
+    - [ ] Database support (integrate with pSCT MySQL database)
+    - [x] Login/logout/forbidden views
+    - [x] Two-level permissions (User + Admin) w/ password hashing
+    - [ ] Implement active/read-only mode
+    - [ ] Restrict UI access based on permissions
+ - [ ] Core
+    - [x] socket.io namespaces, /data, /errors
+    - [x] DeviceModel (Python object-based data model/ OPC UA -> socket.io connector)
+    - [x] TelescopeModel
+    - [x] MirrorModel
+    - [x] EdgeModel
+    - [x] ActuatorModel
+    - [x] PanelModel
+    - [x] MPESModel
+    - [x] Method calling
+    - [ ] Method interrupt/stop
+    - [ ] Master initialization function (traverse OPC UA tree and initialize all models)
+ - [ ] Error Handling
+    - [x] Error Log Table View (DataTables)
+    - [ ] Error Modals/Alerts
+    - [ ] Auto stop/interrupt on error
+ - [ ] Device Tree View (Bootstrap-treeview)
+    - [ ] Support for flat and tree view
+    - [ ] Status badges
+    - [ ] Clickable links to detailed device info
   - [ ] History Logging
-    - [ ] History Log Model
-    - [ ] History Log View
-    - [ ] History Log Controller
-  - [ ] Error Handling
-    - [ ] Error Log Model
-    - [ ] Error Log View
-    - [ ] Error Log Controller
-    - [ ] Error popups/modals
-      - [ ] Goto
-  - [ ] Component/Device Monitoring
-      - [ ] Device/Device Tree Model 
-       - [ ] Telescope Model
-       - [ ] Mirror (Primary/Secondary) Model
-       - [ ] Panel (P1/P2/S1/S2) Model
-       - [ ] Actuator Model
-       - [ ] MPES Model
-      - [ ] Info Box View
-      - [ ] Device Tree Controller
-      - [ ] Device Tree View (treeview)
-  - [ ] Mirror View
-  - [ ] Pointing
-  - [ ] Positioner
-- [ ] Backend
-  - [ ] JSON message format definition
-  - [ ] SubscriptionManager
-  - [ ] Login/Authentication
-    - [ ] MySQL backend
-    
+      - [ ] Backend (server-side in-memory or DB)
+      - [ ] History Log Table View (DataTables)
+  - [ ] Mirror-level view/interface (D3.js)
+    - [x] Display mirror panels as D3 objects
+    - [ ] Display edges, MPES, actuators
+    - [ ] Display component status via color
+    - [x] On-hover tooltips
+    - [ ] Detailed info on-click (go to children)
+    - [ ] Side info window
+ 
 ## Known Issues/Troubleshooting
 
 ## References
@@ -62,7 +72,7 @@ The frontend implementation is based on the MVC (Model-View-Controller) pattern 
   * [Paper 1](https://arxiv.org/abs/1608.03595)
   * [Paper 2](https://arxiv.org/abs/1710.07117)
 
-* Gevent-socketio Documentation: [https://gevent-socketio.readthedocs.io/en/latest/](https://gevent-socketio.readthedocs.io/en/latest/)
+* Python-socketio Documentation: [https://python-socketio.readthedocs.io/en/latest/](https://python-socketio.readthedocs.io/en/latest/)
 * Python OPC UA Documentation: [https://python-opcua.readthedocs.io/en/latest/](https://python-opcua.readthedocs.io/en/latest/)
 * Pyramid Web Framework Documentation: [https://docs.pylonsproject.org/projects/pyramid/en/latest/](https://docs.pylonsproject.org/projects/pyramid/en/latest/)
 
