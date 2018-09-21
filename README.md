@@ -34,7 +34,7 @@ Web GUI for pSCT mirror panel alignment monitoring/control. Built with a Python 
     - [ ] Implement active/read-only mode
     - [ ] Restrict UI access based on permissions
  - [ ] Core
-    - [x] socket.io namespaces, /data, /errors
+    - [x] socket.io namespaces
     - [x] DeviceModel (Python object-based data model/ OPC UA -> socket.io connector)
     - [x] TelescopeModel
     - [x] MirrorModel
@@ -63,6 +63,17 @@ Web GUI for pSCT mirror panel alignment monitoring/control. Built with a Python 
     - [x] On-hover tooltips
     - [ ] Detailed info on-click (go to children)
     - [ ] Side info window
+    
+## Approximate Timeline:
+
+- [ ] (~ 9/25/2018) Complete core functionality (all DeviceModels, initialization function for device tree)
+- [ ] (~ 9/28/2018) Complete Device Tree functionality (Model + Front-end)
+- [ ] (~ 10/5/2018) Complete Error Log and alerts functionality (Model + Front-end)
+- [ ] (~ 10/12/2018) Complete Info window functionality (Model + Front-end)
+- [ ] (~ 10/19/2018) Complete Telescope Mirror View functionality (Model + Front-end)
+- [ ] (~ 10/28/2018) Complete User authentication and history log functionality
+
+
  
 ## Known Issues/Troubleshooting
 
