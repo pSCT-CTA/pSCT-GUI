@@ -23,9 +23,9 @@ Web GUI for pSCT mirror panel alignment monitoring/control. Built with a Python 
 
 ## Major Features/To Do:
 
- - [ ] Web server functionality
+ - [x] Web server functionality
     - [x] Base Pyramid server functionality (views)
-    - [ ] Gevent/greenlet server (using gunicorn)
+    - [x] Gevent/greenlet server (using gunicorn)
  - [ ] User Authentication/Management
     - [x] Database support (local SQLite)
     - [ ] Database support (integrate with pSCT MySQL database)
@@ -33,7 +33,7 @@ Web GUI for pSCT mirror panel alignment monitoring/control. Built with a Python 
     - [x] Two-level permissions (User + Admin) w/ password hashing
     - [ ] Implement active/read-only mode
     - [ ] Restrict UI access based on permissions
- - [ ] Core
+ - [x] Core
     - [x] socket.io namespaces
     - [x] DeviceModel (Python object-based data model/ OPC UA -> socket.io connector)
     - [x] TelescopeModel
@@ -44,18 +44,19 @@ Web GUI for pSCT mirror panel alignment monitoring/control. Built with a Python 
     - [x] MPESModel
     - [x] Method calling
     - [ ] Method interrupt/stop
-    - [ ] Master initialization function (traverse OPC UA tree and initialize all models)
+    - [x] Master initialization function (traverse OPC UA tree and initialize all models)
  - [ ] Error Handling
     - [x] Error Log Table View (DataTables)
     - [ ] Error Modals/Alerts
     - [ ] Auto stop/interrupt on error
- - [ ] Device Tree View (Bootstrap-treeview)
-    - [ ] Support for flat and tree view
-    - [ ] Status badges
-    - [ ] Clickable links to detailed device info
-  - [ ] History Logging
-      - [ ] Backend (server-side in-memory or DB)
-      - [ ] History Log Table View (DataTables)
+ - [x] Device Tree View (Bootstrap-treeview)
+    - [x] Support for flat and tree view
+    - [x] Status badges
+    - [x] Clickable links to detailed device info
+ - [x] Device Info Panel View
+ - [ ] History Logging
+    - [ ] Backend (server-side in-memory or DB)
+    - [ ] History Log Table View (DataTables)
   - [ ] Mirror-level view/interface (D3.js)
     - [x] Display mirror panels as D3 objects
     - [ ] Display edges, MPES, actuators
@@ -66,15 +67,13 @@ Web GUI for pSCT mirror panel alignment monitoring/control. Built with a Python 
     
 ## Approximate Timeline:
 
-- [ ] (~ 9/25/2018) Complete core functionality (all DeviceModels, initialization function for device tree)
-- [ ] (~ 9/28/2018) Complete Device Tree functionality (Model + Front-end)
-- [ ] (~ 10/5/2018) Complete Error Log and alerts functionality (Model + Front-end)
-- [ ] (~ 10/12/2018) Complete Info window functionality (Model + Front-end)
+- [x] (~ 9/25/2018) Complete core functionality (all DeviceModels, initialization function for device tree)
+- [x] (~ 9/28/2018) Complete Device Tree functionality (Model + Front-end)
+- [x] (~ 10/5/2018) Complete Info window functionality (Model + Front-end)
+- [ ] (~ 10/12/2018) Complete Error Log and alerts functionality (Model + Front-end)
 - [ ] (~ 10/19/2018) Complete Telescope Mirror View functionality (Model + Front-end)
 - [ ] (~ 10/28/2018) Complete User authentication and history log functionality
 
-
- 
 ## Known Issues/Troubleshooting
 
 ## References
