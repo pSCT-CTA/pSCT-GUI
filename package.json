@@ -7,8 +7,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "develop": "webpack --config ./psct_gui/config/webpack.dev.js",
+    "develop-v": "webpack --config ./psct_gui/config/webpack.dev.js --display-modules",
     "build": "webpack --config ./psct_gui/config/webpack.prod.js",
-    "develop-watch": "webpack --mode development --watch"
+    "develop-watch": "webpack --config  ./psct_gui/config/webpack.dev.js --watch"
   },
   "repository": {
     "type": "git",
@@ -30,12 +31,13 @@
     "datatables.net-scroller-bs4": "^1.5.1",
     "datatables.net-select-bs4": "^1.2.7",
     "font-awesome": "^4.7.0",
-    "font-awesome-webpack": "0.0.5-beta.2",
+    "font-awesome-webpack": "git+https://github.com/jarecsni/font-awesome-webpack.git#440af2a2efe7ba1779d039556f04538e57bad4bb",
     "jquery": "^3.3.1",
     "json5": "^2.0.1",
     "lodash": "^4.17.11",
     "patternfly-bootstrap-treeview": "^2.1.5",
-    "popper.js": "^1.14.3"
+    "popper.js": "^1.14.3",
+    "socket.io": "^2.1.1"
   },
   "devDependencies": {
     "babel-core": "^6.26.3",
@@ -43,18 +45,24 @@
     "babel-preset-env": "^1.7.0",
     "clean-webpack-plugin": "^0.1.19",
     "css-loader": "^1.0.0",
+    "eslint": "^5.8.0",
+    "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-node": "^8.0.0",
+    "eslint-plugin-promise": "^4.0.1",
+    "eslint-plugin-standard": "^4.0.0",
     "file-loader": "^2.0.0",
     "html-webpack-plugin": "^3.2.0",
     "image-webpack-loader": "^4.3.1",
     "less": "^3.8.1",
     "less-loader": "^4.1.0",
-    "mini-css-extract-plugin": "^0.4.2",
+    "mini-css-extract-plugin": "^0.4.4",
     "node-sass": "^4.9.3",
     "rimraf": "^2.6.2",
     "sass-loader": "^7.1.0",
     "style-loader": "^0.23.0",
     "transfer-webpack-plugin": "^0.1.4",
-    "url-loader": "^1.1.1",
+    "url-loader": "^1.1.2",
     "webpack": "^4.20.2",
     "webpack-cli": "^3.1.0",
     "webpack-merge": "^4.1.4"

@@ -2,6 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin'); const HashedModuleIdsPlugin = require('webpack/lib/HashedModuleIdsPlugin');
 
 module.exports = {
 
@@ -39,8 +40,16 @@ module.exports = {
           // Load a custom template (lodash by default see the FAQ for details)
           template: './templates/layout.jinja2'
         }),
-        new CleanWebpackPlugin(['../dist']),
-        new webpack.HashedModuleIdsPlugin()
+        new CleanWebpackPlugin(['dist']),
+        new webpack.HashedModuleIdsPlugin(),
+        new MiniCssExtractPlugin({
+          filename: "[name].css",
+          chunkFilename: "[id].css"
+        }),
+        new webpack.ProvidePlugin({
+           $: "jquery",
+           jQuery: "jquery"
+       })
     ],
 
     resolve: {
@@ -51,16 +60,35 @@ module.exports = {
         rules: [
             {
                 test: /\.css$/,
-                include: path.resolve(__dirname, '../src/css'),
-                use: [ 'style-loader', 'css-loader' ]
+                use: [MiniCssExtractPlugin.loader, 'css-loader']
             },
             {
                 test: /\.(png|svg|jpg|gif)$/,
-                use: 'file-loader',
+                use: [
+                  {
+                    loader: 'file-loader',
+                    options: {
+                      name: '[name].[ext]',
+                      context: ''
+                    }
+                  }
+                ]
             },
             {
-                test: /\.(woff|woff2|eot|ttf|otf)$/,
-                use: 'file-loader',
+              test: /\.woff(2)?(\?v=[0-9]\.[0-9]\.[0-9])?$/,
+              loader: "url-loader?limit=10000&mimetype=application/font-woff",
+              options: {
+                name: '[name].[ext]',
+                context: ''
+              }
+            },
+            {
+              test: /\.(ttf|eot|svg)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
+              loader: "file-loader",
+              options: {
+                name: '[name].[ext]',
+                context: ''
+              }
             }
         ]
     }

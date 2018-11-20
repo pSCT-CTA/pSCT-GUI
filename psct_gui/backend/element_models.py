@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-
+import socketio
 
 class BaseElementModel(object):
     def __init__(self, socketio_server, namespace_name):
@@ -27,8 +27,8 @@ class BaseElementModel(object):
 # General model object for a tree of devices
 class DeviceTreeModel(BaseElementModel):
 
-    def __init__(self, socketio_server, device_model_trees, device_models_by_type, ):
-        super().__init__(self, socketio_server, '/device_tree', device_model_tree, devices_by_type)
+    def __init__(self, socketio_server, device_tree, devices_by_type):
+        super().__init__(socketio_server, '/device_tree')
 
         class DeviceTreeNamespace(socketio.Namespace):
             # On connect, send initial data for rendering
@@ -55,13 +55,12 @@ class DeviceTreeModel(BaseElementModel):
         self.mode = "tree"
 
         # Dictionary of device models
-        self.device_model_trees = device_model_trees
+        self.device_tree = device_tree
         self.devices_by_type = devices_by_type
 
         # Observe all device models
-        for device_type in self.devices_by_type:
-            for device_model in self.devices_by_type[device_type]:
-                self.observe(device_model)
+        for device_model in device_tree:
+            self.observe(device_model)
 
     def get_tree(self):
         tree = []
@@ -88,7 +87,7 @@ class DeviceTreeModel(BaseElementModel):
 
                 return new_kwargs
 
-            for root_node in self.device_model_trees:
+            for root_node in self.device_tree:
                 subtree = {}
                 NodeModel.traverse_models(root_model, build_tree_callback, parent_dict=subtree)
                 tree.append(subtree)
@@ -114,16 +113,15 @@ class DeviceTreeModel(BaseElementModel):
         return self.get_tree()
 
     def notify(self, data_node_name, data_node_type):
-        if data_node_name == '':
-            self.sio.emit('datachange_notification',
-                {'data': self.data},
-                namespace=self.namespace)
+        self.sio.emit('datachange_notification',
+            {'data': self.data},
+            namespace=self.namespace)
 
 # General model object for an info window view
 class InfoWindowModel(BaseElementModel):
 
-    def __init__(self, socketio_server, device_model):
-        super().__init__(self, socketio_server, '/info_window')
+    def __init__(self, socketio_server, device_model, name="dashboard"):
+        super().__init__(self, socketio_server, '/info_window_' + name)
 
         # A single device model
         self.device_model = device_model
@@ -150,10 +148,109 @@ class InfoWindowModel(BaseElementModel):
 
     @property
     def data(self):
-        return self.device_model.description
+        if self.device_model:
+            return self.device_model.description
+        else:
+            return {}
 
     def notify(self, data_node_name, data_node_type):
-        if data_node_name == '':
-            self.sio.emit('datachange_notification',
-                {'data': self.data},
-                namespace=self.namespace)
+        self.sio.emit('datachange_notification',
+            {'data': self.data},
+            namespace=self.namespace)
+
+# General model object for a tree of devices
+class MirrorDisplayModel(BaseElementModel):
+
+    def __init__(self, socketio_server, mirror_model):
+        super().__init__(self, socketio_server, '/mirror_display_' + type)
+
+        self.type = mirror_model.mirror_type
+
+        class MirrorDisplayNamespace(socketio.Namespace):
+            # On connect, send initial data for rendering
+            def on_connect(self, sid, environ):
+                self.emit('server_connected',
+                    {'name': self.name})
+                self.emit('datachange_notification',
+                    {'data': self.data})
+
+            def on_disconnect(self, sid):
+                self.emit('server_disconnected',
+                    {'name': self.name})
+
+        self.sio.register_namespace(MirrorDisplayNamespace(self.namespace_name))
+
+        self.mirror_model = mirror_model
+        self.panel_models = self.mirror_model.panels
+        self.edge_models = self.mirror_model.edges
+
+        # Observe mirror device model and all descendents
+        self.observe(mirror_model)
+
+    def get_mirror_data(self):
+
+        mirror_data = {}
+
+        mirror_data['mirrors'] = {self.mirror_model.id: self.mirror_model.description}
+        mirror_data['panels'] = {self.mirror_model.id: self.mirror_model.description}
+        mirror_data['edges'] = {self.mirror_model.id: self.mirror_model.description}
+        mirror_data['MPES'] = {self.mirror_model.id: self.mirror_model.description}
+        mirror_data['actuators'] = {self.mirror_model.id: self.mirror_model.description}
+
+        return mirror_data
+
+    @property
+    def data(self):
+        return self.get_mirror_data()
+
+    def notify(self, data_node_name, data_node_type):
+        self.sio.emit('datachange_notification',
+            {'data': self.data},
+            namespace=self.namespace)
+
+# General model object for a tree of devices
+class ErrorLogModel(BaseElementModel):
+
+    def __init__(self, socketio_server, devices_by_type):
+        super().__init__(self, socketio_server, '/error_log')
+
+        class ErrorLogNamespace(socketio.Namespace):
+            # On connect, send initial data for rendering
+            def on_connect(self, sid, environ):
+                self.emit('server_connected',
+                    {'name': 'ErrorLog'})
+                self.emit('datachange_notification',
+                    {'data': self.data})
+
+            def on_disconnect(self, sid):
+                self.emit('server_disconnected',
+                    {'name': 'ErrorLog'})
+
+        self.sio.register_namespace(ErrorLogNamespace(self.namespace_name))
+
+        # Dictionary of device models
+        self.devices_by_type = devices_by_type
+
+        # Observe all device models
+        for device_type in self.devices_by_type:
+            for device_model in self.devices_by_type[device_type]:
+                self.observe(device_model)
+
+    def get_error_data(self):
+
+        error_data = []
+
+        for device_type in self.devices_by_type:
+            for device_model in self.devices_by_type[device_type]:
+                error_data.append(device_model.errors)
+
+        return error_data
+
+    @property
+    def data(self):
+        return self.get_error_data()
+
+    def notify(self, data_node_id, data_node_type):
+        self.sio.emit('datachange_notification',
+            {'data': self.data},
+            namespace=self.namespace)

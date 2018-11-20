@@ -2,7 +2,7 @@
 {% block title %}Login{% endblock %}
 
 {% block head %}
-{{ super() }} 
+<link href="{{request.static_url('psct_gui:dist/login.css')}}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -16,7 +16,7 @@
         </button>
       </div>
       <form class="form-signin">
-        <img src="{{request.static_url('psct_gui:static/img/cta_psct_logo.png')}}" class="img-fluid" alt="Responsive image">
+        <img src="{{request.static_url('psct_gui:static/cta_psct_logo.png')}}" class="img-fluid" alt="Responsive image">
         <h1 class="h3 mb-3 text-center">Login</h1>
         <label for="inputUsername" class="sr-only">Username</label>
         <input type="text" id=="inputUsername" name="username" class="form-control" placeholder="Username" required autofocus>
@@ -28,11 +28,10 @@
   </div>
 </div>
 <div id="footer">
-  <p class="text-muted">By Bryan Kim (bsk2133@columbia.edu), 2018.</p>
+  <p class="text-muted"> For the pSCT project, 2018. Contact: Bryan Kim (bsk2133@columbia.edu).</p>
 </div>
-<script type="text/javascript">
-  {% if request.params.login_attempt is defined %}
-    showLoginAlert("{{request.login_attempt}}");
-  {% endif %}
-</script>
+{% endblock %}
+
+{% block js %}
+<script src="{{request.static_url('psct_gui:dist/login.bundle.js')}}" type="text/javascript></script>
 {% endblock %}

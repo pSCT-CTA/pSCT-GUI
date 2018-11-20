@@ -10,7 +10,8 @@ from pyramid.httpexceptions import (
 
 from pyramid.view import view_config
 
-from ..models import User, HistoryEntry
+from psct_gui.models import User, HistoryEntry
+#from psct_gui.models import device_models
 
 MAX_HISTORY_RECORDS = 100
 

@@ -9,13 +9,13 @@ from pyramid.paster import (
 
 from pyramid.scripts.common import parse_vars
 
-from ..models.meta import Base
-from ..models import (
+from psct_gui.models.meta import Base
+from psct_gui.models import (
     get_engine,
     get_session_factory,
     get_tm_session,
     )
-from ..models import User
+from psct_gui.models import User
 
 
 def usage(argv):

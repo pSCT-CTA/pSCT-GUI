@@ -1,4 +1,6 @@
+import time
 from abc import ABC, abstractmethod
+
 
 # Generic OPC UA subscription handler object, called on event and data change
 # On data change, updates the parent device model's attributes to mirror the underlying
@@ -10,15 +12,15 @@ class SubHandler(object):
         self.device_model = device_model
 
     def datachange_notification(self, node, val, data):
-        print("OPC UA: New data change event", node, val)
+        print("OPC UA: New data change event::::", node, val)
 
         # Determine whether node is an error node or data node
-        if node in self.device_model.__data_node_to_name:
-            name = self.device_model.__data_node_to_name[node]
+        if node in self.device_model._data_node_to_name:
+            name = self.device_model._data_node_to_name[node]
             type = 'data'
             d = self.device_model.data
-        elif node in self.device_model.__error_node_to_name:
-            name = self.device_model.__error_node_to_name[node]
+        elif node in self.device_model._error_node_to_name:
+            name = self.device_model._error_node_to_name[node]
             type = 'error'
             d = self.device_model.errors
         else:
@@ -26,12 +28,13 @@ class SubHandler(object):
 
         # Write changed value and notify observers of data change
         d[name] = data.monitored_item.Value.Value.Value
-        self.notify_observers(name, type)
+        self.device_model.notify_observers(node.nodeid, type)
 
     def event_notification(self, event):
         print("OPC UA: New event", event)
 
-# Generic wrapper class for OPC UA nodes. Only subclassed to handle
+# Generic wrapper class for OPC UA nodes. Subclassed to represent both
+# folder and object nodes (not property and variable nodes).
 # Handles general object/folder lookup, recursive traverse, etc.
 class NodeModel(object):
 
@@ -48,8 +51,8 @@ class NodeModel(object):
     # Class method to instantiate a new node model subclass from an OPC UA
     # object node (based on its object type)
     @classmethod
-    def create(obj_node, opcua_client, *args, **kwargs):
-        model_class = NODE_ID_TO_MODEL[obj_node.get_type_definition()]
+    def create(cls, obj_node, opcua_client, *args, **kwargs):
+        model_class = NODE_ID_TO_MODEL[obj_node.get_type_definition().to_string()]
         model = model_class(obj_node, opcua_client, *args, **kwargs)
         NodeModel.ALL_NODES[model.id] = model
 
@@ -60,78 +63,38 @@ class NodeModel(object):
 
         return model
 
-    # Recursive class method to initialize all device models from the OPC UA objects node
-    @classmethod
-    def initialize_all(root_obj_nodes, opcua_client):
-        model_trees = []
-        devices_by_type = {}
-
-        # Function to recursively traverse node tree
-        def __traverse_node(node, parent_model, opcua_client, devices_by_type):
-
-            # If node already seen, get corresponding model
-            if node.id in NodeModel.ALL_NODES:
-                model = NodeModel.ALL_NODES[node.id]
-                recurse = False
-            else:
-                model = NodeModel.create(node, opcua_client)
-                recurse = True
-            parent_model.add_child(model)
-
-            if issubclass(model, DeviceModel):
-                device_type = ALL_DEVICE_MODELS_TO_NAME[model.__class__]
-                # Add device model to devices_by_type dictionary
-                if device_type not in devices_by_type:
-                    devices_by_type[device_type] = {}
-                devices_by_type[device_type][model.name] = model
-
-            # Recurse through children, including references
-            # Only if not seen before
-            if recurse and node.get_children(refs=31):
-                for n in node.get_children(refs=31):
-                    __traverse_node(n, model, opcua_client, devices_by_type)
-
-            return model
-
-        for node in root_obj_nodes:
-            model_trees.append(__traverse_node(node, None, opcua_client, devices_by_type))
-
-        return model_trees, devices_by_type
-
     # Method to recurse through a fully initialized model tree
     # And call a callback function on every model.
     @staticmethod
     def traverse_models(root_model, callback_fn, **kwargs):
 
-        seen = {}
+        seen = set()
 
         # Generic traversal function
         def __traverse(model, callback_fn, seen=seen, **kwargs):
             if model.id in seen:
-                model = seen[node.id]
-                recurse = False
+                return
             else:
-                seen[model.id] = model
-                recurse = True
+                seen.add(model.id)
 
-            new_args = callback_fn(model, **kwargs)
+            callback_fn(model, **kwargs)
 
-            if recurse and model.children:
+            if model.children:
                 for child in model.children:
-                    __traverse(child, seen=seen, **new_args)
+                    __traverse(child, seen=seen, **kwargs)
 
         __traverse(root_model, callback_fn, seen=seen, **kwargs)
 
     def __init__(self, obj_node, opcua_client):
+
+        # OPC UA client
+        self._opcua_client = opcua_client
 
         # OPC UA object node, node name, node id, node object type
         self._obj_node = obj_node
         self._node_name = self._obj_node.get_display_name()
         self._node_id = self._obj_node.nodeid
         self._node_object_type = self._opcua_client.get_node(self._obj_node.get_type_definition()).get_display_name()
-
-        # OPC UA client
-        self._opcua_client = opcua_client
 
         self._children = []
 
@@ -176,11 +139,12 @@ class NodeModel(object):
 
 # Folder model class. Wraps OPC UA foldertype nodes.
 # implements only basic functionality.
-
 class FolderModel(NodeModel):
 
+    ALL_FOLDERS = {}
+
     def __init__(self, obj_node, opcua_client):
-        super().__init__(self, obj_node, opcua_client)
+        super().__init__(obj_node, opcua_client)
 
     @property
     def self_status(self):
@@ -194,58 +158,64 @@ class DeviceModel(NodeModel):
     ERROR_NODE_NAME = "0:Errors"
 
     DEFAULT_DATA_SUBSCRIPTION_PERIOD = 1000
-    DEFAULT_ERROR_SUBSCRIPTION_PERIOD = 100
-
-    # Subscription instances are shared across all device models
-    __subscriptions = []
+    DEFAULT_ERROR_SUBSCRIPTION_PERIOD = 1000
 
     # Dictionary of all devices by node id
     ALL_DEVICES = {}
 
+    DEVICES_BY_TYPE = {}
+    DEVICE_TREES = []
+
     def __init__(self, obj_node, opcua_client, sub_periods={}):
 
-        super().__init__(self, obj_node, opcua_client)
+        super().__init__(obj_node, opcua_client)
 
         # Subscription handler
         self._sub_handler = SubHandler(self)
+        self._subscriptions = {}
+
+        # Observing element models
+        self.observers = []
 
         # All monitored internal nodes
-        self._data_nodes = {node.get_display_name(): node
+        self._data_nodes = {node.get_display_name().to_string(): node
             for node in self._obj_node.get_properties() + self._obj_node.get_variables()}
-        self._method_nodes = {node.get_display_name(): node
+        self._method_nodes = {node.get_display_name().to_string(): node
             for node in self._obj_node.get_methods()}
-        self._error_nodes = {node.get_display_name(): node
-            for node in self._obj_node.get_child([ERROR_NODE_NAME]).get_variables()}
+        try:
+            self._error_nodes = {node.get_display_name().to_string(): node
+                for node in self._obj_node.get_child([DeviceModel.ERROR_NODE_NAME]).get_variables()}
+        except:
+            self._error_nodes = {}
 
         # Dictionaries mapping node objects to node names
         # Used by the subscription handler to retrieve the name of the changed node
         # in a data change notification
-        self.__data_node_to_name = {node: node.get_display_name() for node in data_nodes}
-        self.__error_node_to_name = {node: node.get_display_name() for node in error_nodes}
+        self._data_node_to_name = {self._data_nodes[node_name]: node_name for node_name in self._data_nodes}
+        self._error_node_to_name = {self._error_nodes[node_name]: node_name for node_name in self._error_nodes}
 
         # Initialize data dictionary and error dictionary.
         # Maps data property/error names to values
-        self._data = {node.get_display_name(): node.get_value() for node in data_nodes}
-        self._errors = {node.get_display_name(): node.get_value() for node in error_nodes}
+        self._data = {node_name: self._data_nodes[node_name].get_value() for node_name in self._data_nodes}
+        self._errors = {node_name: self._error_nodes[node_name].get_value() for node_name in self._error_nodes}
 
         # Subscribe to data changes in all properties/variables + errors
         for n, node_dict in [('data', self._data_nodes), ('errors', self._error_nodes)]:
             if n == 'data':
-                DEFAULT_SUBSCRIPTION_PERIOD = DEFAULT_DATA_SUBSCRIPTION_PERIOD
+                DEFAULT_SUBSCRIPTION_PERIOD = DeviceModel.DEFAULT_DATA_SUBSCRIPTION_PERIOD
             elif n == 'errors':
-                DEFAULT_SUBSCRIPTION_PERIOD = DEFAULT_ERROR_SUBSCRIPTION_PERIOD
+                DEFAULT_SUBSCRIPTION_PERIOD = DeviceModel.DEFAULT_ERROR_SUBSCRIPTION_PERIOD
 
-            for name, node in node_dict:
+            for node_name in node_dict:
                 # If node is provided in sub_periods, use provided custom subscription period.
                 # Else use default
-                sub_period = sub_periods[name] if name in sub_periods else DEFAULT_SUBSCRIPTION_PERIOD
-                # If subscription with a given period does not exist, create, else re-use existing subscription
-                if sub_period not in self.__subscriptions:
-                    sub = self._opcua_client.create_subscription(sub_period, self._sub_handler)
-                    self.__subscriptions[sub_period] = sub
+                sub_period = sub_periods[node_name] if node_name in sub_periods else DEFAULT_SUBSCRIPTION_PERIOD
+                if sub_period in self._subscriptions:
+                    sub = self._subscriptions[sub_period]
                 else:
-                    sub = self.__subscriptions[sub_period]
-                sub.subscribe_data_change(node)
+                    sub = self._opcua_client.create_subscription(sub_period, self._sub_handler)
+                    self._subscriptions[sub_period] = sub
+                sub.subscribe_data_change(node_dict[node_name])
 
     # Dictionary of data property names and values
     @property
@@ -269,25 +239,40 @@ class DeviceModel(NodeModel):
     def description(self):
        pass
 
+    # Returns a list of all device models which descend from this model
+    @property
+    def descendents(self):
+        descendents = []
+        def get_descendents_callback(model, descendents=descendents):
+            if model.__class__ in ALL_DEVICE_MODELS_TO_NAME:
+                descendents.append(model)
+
+        NodeModels.traverse_models(self, get_descendents_callback, descendents=descendents)
+        return descendents
+
     # Calls an object method and returns its return value
     def call_method(self, method_name, *args):
         return_values = self._obj_node.call_method(self._methods[method_name], *args)
         return return_values
 
     # Add an observer model which will be notified whenever there is a data change in this device
+    # Recursively observes all descendents as well
     # The observer model should implement a self.notify() method
     def add_observer(self, observer):
         self.observers.append(observer)
+        for device_model in self.descendents:
+            device_model.observers.append(observer)
 
-    # Notifies all attached observers that the device has experienced a data change
-    def notify_observers(self, data_node_name, data_node_type):
+    # Notifies all attached observers that one of the device nodes has experienced
+    # a data change
+    def notify_observers(self, data_node_id, data_node_type):
         for observer in self.observers:
-            observer.notify(data_node_name, data_node_type)
+            observer.notify(data_node_id, data_node_type)
 
 class TelescopeModel(DeviceModel):
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client, sub_periods={}):
+        super().__init__(obj_node, opcua_client, sub_periods=sub_periods)
 
     @property
     def description(self):
@@ -323,10 +308,13 @@ class MirrorModel(DeviceModel):
 
     MIRROR_TYPE_NODE_NAME = ''
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client, sub_periods={}):
+        super().__init__(obj_node, opcua_client, sub_periods=sub_periods)
 
-        self.mirror_type = self._obj_node.get_child([MIRROR_TYPE_NODE_NAME]).get_value()
+        try:
+            self.mirror_type = self._obj_node.get_child([MirrorModel.MIRROR_TYPE_NODE_NAME]).get_value()
+        except:
+            self.mirror_type = None
 
     @property
     def description(self):
@@ -345,6 +333,10 @@ class MirrorModel(DeviceModel):
     @property
     def panels(self):
         return [child for child in self.children if isinstance(child, PanelModel)]
+
+    @property
+    def edges(self):
+        return [child for child in self.children if isinstance(child, EdgeModel)]
 
     @property
     def P1_panels(self):
@@ -379,16 +371,19 @@ class PanelModel(DeviceModel):
 
     PANEL_NUMBER_NODE_NAME = ''
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client, sub_periods={}):
+        super().__init__(obj_node, opcua_client, sub_periods=sub_periods)
 
-        self.panel_number = self._obj_node.get_child([PANEL_NUMBER_NODE_NAME]).get_value()
-        if (self.panel_number // 1000)%10 == 1:
-            self.mirror_identifier = 'P'
-        elif (self.panel_number // 1000)%10 == 2:
-            self.mirror_indentifier = 'S'
-        self.ring_number = (self.panel_number // 10)%10
-        self.panel_type = self.mirror_indentifier + str(self.ring_number)
+        try:
+            self.panel_number = self._obj_node.get_child([PANEL_NUMBER_NODE_NAME]).get_value()
+            if (self.panel_number // 1000)%10 == 1:
+                self.mirror_identifier = 'P'
+            elif (self.panel_number // 1000)%10 == 2:
+                self.mirror_indentifier = 'S'
+            self.ring_number = (self.panel_number // 10)%10
+            self.panel_type = self.mirror_indentifier + str(self.ring_number)
+        except:
+            self.panel_number = None
 
         self.add_adjacent_panels()
 
@@ -429,8 +424,8 @@ class PanelModel(DeviceModel):
 
 class EdgeModel(DeviceModel):
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client, sub_periods={}):
+        super().__init__(obj_node, opcua_client, sub_periods=sub_periods)
 
     @property
     def description(self):
@@ -457,8 +452,8 @@ class EdgeModel(DeviceModel):
 
 class ActuatorModel(DeviceModel):
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client,  sub_periods={}):
+        super().__init__(obj_node, opcua_client,  sub_periods=sub_periods)
 
     @property
     def description(self):
@@ -476,8 +471,8 @@ class ActuatorModel(DeviceModel):
 
 
 class MPESModel(DeviceModel):
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client, sub_periods={}):
+        super().__init__(obj_node, opcua_client, sub_periods=sub_periods)
 
     @property
     def description(self):
@@ -496,8 +491,8 @@ class MPESModel(DeviceModel):
 
 class GASSystemModel(DeviceModel):
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client, sub_periods={}):
+        super().__init__(obj_node, opcua_client, sub_periods=sub_periods)
 
     @property
     def description(self):
@@ -516,8 +511,8 @@ class GASSystemModel(DeviceModel):
 
 class PointingSystemModel(DeviceModel):
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client,  sub_periods={}):
+        super().__init__(obj_node, opcua_client,  sub_periods=sub_periods)
 
     @property
     def description(self):
@@ -532,8 +527,8 @@ class PointingSystemModel(DeviceModel):
 
 class PositionerModel(DeviceModel):
 
-    def __init__(self, obj_node, opcua_client, socketio_server, sub_periods={}):
-        super().__init__(self, obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
+    def __init__(self, obj_node, opcua_client,  sub_periods={}):
+        super().__init__(obj_node, opcua_client, socketio_server, sub_periods=sub_periods)
 
     @property
     def description(self):
@@ -572,6 +567,6 @@ NODE_ID_TO_MODEL = {
         'ns=2;i=1100': MPESModel,
         '': GASSystemModel,
         '': PointingSystemModel,
-        '': PositionerModel,
+        'ns=2;i=0': PositionerModel,
         'i=61': FolderModel
 }
