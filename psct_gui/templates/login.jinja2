@@ -1,3 +1,42 @@
+<<<<<<< Updated upstream
+{% extends "layout.jinja2" %}
+{% block title %}Login{% endblock %}
+
+{% block head %}
+<link href="{{request.static_url('psct_gui:dist/login.css')}}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container h-100">
+  <div class="row h-100 justify-content-center align-items-center">
+    <div id='login_container' class="col-md-4">
+      <div id="login_alert" class="alert alert-dismissible fade hidden" role="alert">
+        <p class="alert-text"></p>
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form class="form-signin">
+        <img src="{{request.static_url('psct_gui:static/cta_psct_logo.png')}}" class="img-fluid" alt="Responsive image">
+        <h1 class="h3 mb-3 text-center">Login</h1>
+        <label for="inputUsername" class="sr-only">Username</label>
+        <input type="text" id=="inputUsername" name="username" class="form-control" placeholder="Username" required autofocus>
+        <label for="inputPassword" class="sr-only">Password</label>
+        <input type="password" id="inputPassword" name="password" class="form-control" placeholder="Password" required>
+        <button class="btn btn-lg btn-primary btn-block" type="submit" name="form.submitted" value="Log In">Sign in</button>
+      </form>
+    </div>
+  </div>
+</div>
+<div id="footer">
+  <p class="text-muted"> For the pSCT project, 2018. Contact: Bryan Kim (bsk2133@columbia.edu).</p>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="{{request.static_url('psct_gui:dist/login.bundle.js')}}" type="text/javascript></script>
+{% endblock %}
+=======
 {% extends "layout.jinja2" %}
 {% block title %}Login{% endblock %}
 
@@ -36,3 +75,4 @@
   {% endif %}
 </script>
 {% endblock %}
+>>>>>>> Stashed changes
