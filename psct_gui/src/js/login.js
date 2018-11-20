@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 // Import all required js modules
 import * as $ from 'jquery';
 import Popper from 'popper.js';
@@ -47,3 +48,9 @@ function showLoginAlert(login_attempt) {
 
 // Show login alert
 showLoginAlert(login_info.login_status);
+=======
+import * as core from './core.js';
+
+// Import CSS styles
+import '../css/styles.css';
+>>>>>>> Stashed changes

@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 // Import all required js modules
 import * as $ from 'jquery';
 import Popper from 'popper.js';
@@ -34,3 +35,11 @@ $( document ).ready(function() {
 
 
 });
+=======
+// Import
+import * as core from './core.js';
+import * as views from './views.js';
+
+// Import CSS styles
+import '../css/styles.css';
+>>>>>>> Stashed changes
