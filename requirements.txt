@@ -16,7 +16,6 @@ MarkupSafe==1.0
 more-itertools==4.3.0
 opcua==0.98.5
 PasteDeploy==1.5.2
-pkg-resources==0.0.0
 plaster==1.0
 plaster-pastedeploy==0.6
 pluggy==0.7.1
