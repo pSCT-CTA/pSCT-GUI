@@ -32,7 +32,7 @@ class BackendServer(object):
                  opcua_client,
                  socketio_server,
                  opcua_device_tree_node_name="2:DeviceTree",
-                 stop_method_id=""):
+                 stop_method_id="2:Stop"):
         """Instantiate a BackendServer instance."""
         self.opcua_client = opcua_client
         self.sio = socketio_server
@@ -146,6 +146,91 @@ class BackendServer(object):
         return model
 
 
+class TestBackendServer(BackendServer):
+    def __init__(self,
+                 opcua_client,
+                 socketio_server,
+                 panel_node_name="2:Panel_2111",
+                 stop_method_id="2:Stop"):
+        """Instantiate a BackendServer instance."""
+        self.opcua_client = opcua_client
+        self.sio = socketio_server
+        self.sio_clients = []
+
+        self.device_models = {}
+
+        self.panel_node_name = panel_node_name
+
+        # Setup server connect and disconnect responses
+        @self.sio.on('connect')
+        def on_connect(sid, environ):
+            logger.info("Client connected: {}".format(sid))
+            self.sio_clients.append(sid)
+            for nodeid, device_model in self.device_models:
+                device_model.send_initial_data(sid)
+            self.sio.emit('all_device_models_created')
+
+        @self.sio.on('disconnect')
+        def on_disconnect(sid):
+            logger.info("Client disconnected: {}".format(sid))
+
+        @self.sio.on('call_method')
+        def on_call_method(self, sid, data):
+            device_id = data['device_id']
+            method_name = data['method_name']
+            args = data['args']
+
+            logger.info("Call request for method: {} on device ID: {}.".format(
+                method_name, device_id))
+
+            if method_name == "stop":
+                self.device_models[device_id].call_stop()
+            else:
+                self.device_models[device_id].call_method(method_name, args)
+
+    def run(self):
+        """Connect to OPC UA server, create device models, and wait."""
+        logger.info("Connecting to OPC UA server and loading type defs... ")
+        self.opcua_client.connect()
+        self.opcua_client.load_type_definitions()
+
+        self.panel_node = (
+            self.opcua_client.get_objects_node().get_child(
+                self.panel_node_name))
+
+        # First, recurse through node tree to identify all devices
+        # and their relationships
+        self._initialize_device_models()
+        for nodeid, device_model in self.device_models:
+            device_model.start_subscriptions()
+
+        # Keep thread alive
+        while True:
+            gevent.sleep(0.1)
+
+    def stop(self):
+        """Stop and disconnect OPC UA client."""
+        logger.info("Disconnecting socketio clients...")
+        while self.sio_clients:
+            sid = self.sio_clients.pop()
+            self.sio.disconnect(sid)
+            logger.info("Client {} disconnected.".format(sid))
+        logger.info("Disconnecting OPC UA client...")
+        self.opcua_client.disconnect()
+
+    def _initialize_device_models(self):
+        logger.info("Creating device model...")
+        node_type = self._opcua_client.get_node(
+            self._obj_node.get_type_definition())
+        model = device_models.DeviceModel.create(
+            self.panel_node, self.opcua_client)
+        self.device_models[self.panel_node.nodeid] = model
+
+        logger.info("Created device model with type {}, node id {}.".format(
+            node_type, self.panel_node.nodeid
+        ))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the background thread "
                                      "connecting to the OPC UA aggregating "
@@ -165,7 +250,8 @@ if __name__ == "__main__":
     sio = socketio.Server()
     opcua_client = opcua.Client(args.opcua_server_address, timeout=60)
 
-    serv = BackendServer(opcua_client, sio)
+    # serv = BackendServer(opcua_client, sio)
+    serv = TestBackendServer(opcua_client, sio)
     try:
         serv.run()
     except KeyboardInterrupt:
