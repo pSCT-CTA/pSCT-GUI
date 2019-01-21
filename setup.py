@@ -28,8 +28,12 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
+    install_requires=[
+          'opcua==0.98.5',
+          'gevent==1.3.6',
+          'gevent_socketio==0.3.6'
+     ],
     extras_require={
         'testing': tests_require,
-    },
-    install_requires=requires,
+    }
 )
