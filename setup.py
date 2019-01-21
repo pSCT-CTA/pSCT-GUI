@@ -2,20 +2,7 @@ import os
 
 from setuptools import setup, find_packages
 
-requires = [
-    'bcrypt',
-    'docutils',
-    'plaster_pastedeploy',
-    'pyramid >= 1.9a',
-    'pyramid_debugtoolbar',
-    'pyramid_jinja2',
-    'pyramid_retry',
-    'pyramid_tm',
-    'SQLAlchemy',
-    'transaction',
-    'zope.sqlalchemy',
-    'waitress',
-]
+requires = []
 
 tests_require = [
     'WebTest >= 1.3.1',  # py3 compat
@@ -37,7 +24,7 @@ setup(
     author='Bryan Kim',
     author_email='bryan.sanghyuk.kim@gmail.com',
     url='',
-    keywords='web pyramid pylons',
+    keywords='web',
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
@@ -45,12 +32,4 @@ setup(
         'testing': tests_require,
     },
     install_requires=requires,
-    entry_points={
-        'paste.app_factory': [
-            'main = psct_gui:main',
-        ],
-        'console_scripts': [
-            'initialize_psct_gui_db = psct_gui.scripts.initializedb:main',
-        ],
-    },
 )
