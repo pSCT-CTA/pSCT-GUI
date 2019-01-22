@@ -58,12 +58,12 @@ class SubHandler(object):
 
         logger.info("OPC UA: Data change - {} : {} : {} : {}".format(
             self._device_model.id, type, name, value))
-        self._socketio_server.emit('data_change', {
-            'device_id': self._device_model.id,
-            'data_type': type,
-            'data_name': name,
-            'data_value': value
-        })
+        if self._socketio_server:
+            self._socketio_server.emit('data_change', {
+                'device_id': self._device_model.id,
+                'type': type,
+                'name': name,
+                'value': value})
 
     def event_notification(self, event):
         """Call a callback function on an event in a monitored node."""
@@ -94,13 +94,13 @@ class DeviceModel(ABC):
 
     Attributes
     ----------
-    DEVICE_TYPE : str
+    DEVICE_TYPE_NAME : str
         Name of this device type (for printing and dictionary lookup).
     TYPE_NODE_ID : str
         OPC UA node id for the type node corresponding to this device type.
     FOLDER_TYPE_NODE_ID : str
         Node ID of OPC UA folder type node.
-    ERROR_NODE_NAME : str
+    ERROR_NODE_BROWSE_NAME : str
         Browse name of the folder node under each device which contains the
         error nodes.
     DEFAULT_DATA_SUBSCRIPTION_PUBLISH_INTERVAL : int
@@ -110,11 +110,10 @@ class DeviceModel(ABC):
 
     """
 
-    DEVICE_TYPE = "BaseDeviceModel"
-    TYPE_NODE_ID = ""
+    DEVICE_TYPE_NAME = "BaseDeviceModel"
 
     FOLDER_TYPE_NODE_ID = "i=61"
-    ERROR_NODE_NAME = "0:Errors"
+    ERROR_NODE_BROWSE_NAME = "0:Errors"
 
     DEFAULT_DATA_SUBSCRIPTION_PUBLISH_INTERVAL = 1000
     DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL = 1000
@@ -123,13 +122,18 @@ class DeviceModel(ABC):
     def __init__(self,
                  obj_node,
                  opcua_client,
-                 socketio_server,
+                 socketio_server=None,
                  sub_periods={}):
         """Instantiate a DeviceModel instance."""
         self._opcua_client = opcua_client
-        self._socketio_server = socketio_server
-
         self._sub_periods = sub_periods
+
+        self._exit = threading.Event()
+
+        if socketio_server:
+            self._socketio_server = socketio_server
+            self._sub_handler = SubHandler(self)
+            self._subscriptions = {}
 
         # OPC UA object node, node name, node id, node object type
         self._obj_node = obj_node
@@ -138,39 +142,38 @@ class DeviceModel(ABC):
 
         self._id = self._obj_node.node_id
         self._name = self._obj_node.get_display_name()
-        self._node_type = self._type_node.get_display_name()
+        self._device_type_name = self.DEVICE_TYPE_NAME
+        self._node_type_name = self._type_node.get_display_name()
 
-        self._device_type = self.DEVICE_TYPE
-        self._children = {}
-
-        # Subscription handler
-        self._sub_handler = SubHandler(self)
-        self._subscriptions = {}
+        self.children = {}
+        self.parents = []
 
         # Flag indicating whether a method is being executed
-        #  (only 1 allowed concurrently)
+        # (only 1 allowed concurrently)
         self._busy = False
 
-        # All monitored internal nodes
+        # All monitored data nodes (properties and variables)
         _data_nodes = (
             self._obj_node.get_properties() + self._obj_node.get_variables())
 
+        # NOTE: Requires that node display names for all properties
+        # and variables are unique within each device
         self._data_nodes = {node.get_display_name().to_string(): node
                             for node in _data_nodes}
 
+        # TEMPORARY: Try-catch to allow instantiation even if errors not
+        # implemented
         try:
             _error_nodes = self._obj_node.get_child(
-                [DeviceModel.ERROR_NODE_NAME]).get_variables()
+                [DeviceModel.ERROR_NODE_BROWSE_NAME]).get_variables()
             self._error_nodes = {node.get_display_name().to_string(): node
                                  for node in _error_nodes}
         except Exception:
             self._error_nodes = {}
 
-        self._method_nodes = {str(node.get_display_name()): node
-                              for node in self._obj_node.get_methods()}
-
-        self._method_names_to_ids = {str(node.get_display_name()): node.node_id
-                                     for node in self._obj_node.get_methods()}
+        self._method_names_to_ids = {
+            node.get_display_name().to_string(): node.node_id
+            for node in self._obj_node.get_methods()}
 
         # Dictionaries mapping node objects to node names
         # Used by the subscription handler to retrieve the name of the changed
@@ -226,15 +229,14 @@ class DeviceModel(ABC):
         return self._data
 
     @property
-    def methods(self):
-        """dict: Dictionary of method node display names (str) and values."""
-        return self._method_nodes.keys()
-
-    # Dictionary of error flags
-    @property
     def errors(self):
         """dict: Dictionary of error node display names (str) and values."""
         return self._errors
+
+    @property
+    def methods(self):
+        """dict: Dictionary of method node display names (str) and node ids."""
+        return self._method_names_to_ids
 
     @property
     def name(self):
@@ -247,27 +249,14 @@ class DeviceModel(ABC):
         return self._id
 
     @property
-    def node_type(self):
-        """str: Display name of this device's OPC UA type node."""
-        return self._node_type
-
-    @property
     def type(self):
         """str: Name of this device's type."""
-        return self._device_type
-
-    @property
-    def children(self):
-        """dict of (str: dict of (str: DeviceModel): Dict of child devices.
-
-        First key is device type name, second key is device id.
-        """
-        return self._children
+        return self._device_type_name
 
     @property
     def all_children(self):
         """list of DeviceModel: Flat list of all children devices."""
-        return [c for l in self._children.values() for c in l]
+        return [c for l in self.children.values() for c in l]
 
     def send_initial_data(self, sid):
         """Send data describing this device to a client browser via socketio.
@@ -278,16 +267,22 @@ class DeviceModel(ABC):
             Session ID of the client to send data to.
 
         """
-        self._socketio_server.emit('create_device_model', room=sid, data={
-            'device_id': self._device_model.id,
+        initial_data = {
+            'device_id': self.id,
             'name': self.name,
             'type': self.type,
             'data': self.data,
             'errors': self.errors,
             'methods': self._method_names_to_ids,
             'children': {type: [model.id for model in self.children[type]]
-                         for type in self.children}
-        })
+                         for type in self.children},
+            'parents': [model.id for model in self.parents]
+        }
+        logger.info("Device {}: Initial Data: {}".format(
+            self.name, initial_data))
+        if self._socketio_server:
+            self._socketio_server.emit('initial_data', room=sid,
+                                       data=initial_data)
 
     def start_subscriptions(self):
         """Add a DeviceModel as a child of this device.
@@ -330,9 +325,10 @@ class DeviceModel(ABC):
             DeviceModel to add as a child.
 
         """
-        if child.type not in self._children:
-            self._children[child.type] = []
-        self._children[child.type].append(child)
+        if child.type not in self.children:
+            self.children[child.type] = []
+        self.children[child.type].append(child)
+        child.parents.append(self)
 
     # Calls an object method and returns its return value
     def call_method(self, method_name, args):
@@ -355,59 +351,90 @@ class DeviceModel(ABC):
 
         """
         if not self._busy:
-            method_id = self._methods[method_name]
-            thread = threading.Thread(
-                target=self._obj_node.call_method,
-                args=(method_id, *args))
+            if method_name in self.methods:
+                self._busy = True
+                return_values = self._obj_node.call_method(
+                    self.methods[method_name], args)
+                if self._socketio_server:
+                    self._socketio_server.emit('method_return', {
+                        'device_id': self.id,
+                        'method_name': method_name,
+                        'args': args,
+                        'return_values': return_values})
+                self._busy = False
 
-            thread.start()
+                return return_values
+            else:
+                logger.error("Method name {} not found in device {}.".format(
+                    method_name, self.name))
+
         else:
-            self._socketio_server.emit('device_busy')
+            logger.warning("Device {} busy. Method call {} blocked.".format(
+                self.name, method_name))
+            if self._socketio_server:
+                self._socketio_server.emit('device_busy', {
+                    'device_id': self.id,
+                    'method_name': method_name})
+
+        return False
+
+    def call_method_background(self, method_name, args):
+        if not self._busy:
+            if method_name in self.methods:
+                self._busy = True
+                thread = threading.Thread(
+                    target=self._call_method,
+                    args=(self.methods[method_name], args))
+                thread.start()
+            else:
+                logger.error("Method name {} not found in device {}.".format(
+                    method_name, self.name))
+
+        else:
+            logger.warning("Device {} busy. Method call {} blocked.".format(
+                self.name, method_name))
+            if self._socketio_server:
+                self._socketio_server.emit('device_busy', {
+                    'device_id': self.id,
+                    'method_name': method_name})
+
+        return False
 
     def _call_method(self, method_name, args):
-        self._busy = True
-
-        self._socketio_server.emit(
-            'method_called',
-            data={'device_id': self.id,
-                  'method_name': method_name,
-                  'args': args})
-
-        return_vals = self._obj_node.call_method(
-            self._methods[method_name], *args)
-
+        return_values = self._obj_node.call_method(
+            self.methods[method_name], args)
+        logger.info("Device {} - Method {} returned. Return vals: {}".format(
+            self.name, method_name, return_values))
         if self._busy:
-            self._socketio_server.emit(
-                'method_call_returned',
-                data={'device_id': self.id,
-                      'method_name': method_name,
-                      'args': args,
-                      'return_values': return_vals})
-
+            if self._socketio_server:
+                self._socketio_server.emit('method_return', {
+                    'device_id': self.id,
+                    'method_name': method_name,
+                    'args': args,
+                    'return_values': return_values})
             self._busy = False
-
-        return return_vals
 
     def call_stop(self):
         if self._busy:
-            self._obj_node.call_method(
-                self._methods['stop'], [])
-            self._socketio_server.emit(
-                'stopped',
-                data={'device_id': self.id})
+            self._obj_node.call_method(self.methods['stop'], [])
+            logger.info("Device {} - Stop called.".format(self.name))
+            if self._socketio_server:
+                self._socketio_server.emit('method_stopped', {
+                    'device_id': self.id})
             self._busy = False
 
 
 class TelescopeModel(DeviceModel):
     """Model class for a telescope device."""
 
-    DEVICE_TYPE = "Telescope"
+    DEVICE_TYPE_NAME = "Telescope"
     TYPE_NODE_ID = "placeholder_telescope"
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a TelescopeModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
 
@@ -421,14 +448,15 @@ class MirrorModel(DeviceModel):
 
     """
 
-    DEVICE_TYPE = "Mirror"
+    DEVICE_TYPE_NAME = "Mirror"
     TYPE_NODE_ID = "ns=2;i=100"
     MIRROR_TYPE_NODE_NAME = ''
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a MirrorModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
         try:
@@ -448,27 +476,29 @@ class PanelModel(DeviceModel):
 
     """
 
-    DEVICE_TYPE = "Panel"
+    DEVICE_TYPE_NAME = "Panel"
     TYPE_NODE_ID = "ns=2;i=2000"
     PANEL_NUMBER_NODE_NAME = ''
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a PanelModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
         try:
             self.panel_number = self._obj_node.get_child(
                 [self.PANEL_NUMBER_NODE_NAME]).get_value()
-            if (self.panel_number // 1000) % 10 == 1:
-                self.mirror_identifier = 'P'
-            elif (self.panel_number // 1000) % 10 == 2:
-                self.mirror_indentifier = 'S'
-            self.ring_number = (self.panel_number // 10) % 10
-            self.panel_type = self.mirror_indentifier + str(self.ring_number)
         except Exception:
-            self.panel_number = None
+            self.panel_number = int(self.name[-4:])
+
+        if (self.panel_number // 1000) % 10 == 1:
+            self.mirror_identifier = 'P'
+        elif (self.panel_number // 1000) % 10 == 2:
+            self.mirror_indentifier = 'S'
+        self.ring_number = (self.panel_number // 10) % 10
+        self.panel_type = self.mirror_indentifier + str(self.ring_number)
 
         self.add_adjacent_panels()
 
@@ -491,83 +521,89 @@ class PanelModel(DeviceModel):
 class EdgeModel(DeviceModel):
     """Model class for a panel edge device."""
 
-    DEVICE_TYPE = "Edge"
+    DEVICE_TYPE_NAME = "Edge"
     TYPE_NODE_ID = "ns=2;i=1000"
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a EdgeModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
 
 class ActuatorModel(DeviceModel):
     """Model class for a stewart platform actuator device."""
 
-    DEVICE_TYPE = "Actuator"
+    DEVICE_TYPE_NAME = "Actuator"
     TYPE_NODE_ID = "ns=2;i=2100"
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a ActuatorModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
 
 class MPESModel(DeviceModel):
     """Model class for a mirror panel edge sensor device."""
 
-    DEVICE_TYPE = "MPES"
+    DEVICE_TYPE_NAME = "MPES"
     TYPE_NODE_ID = "ns=2;i=1100"
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a MPESModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
 
 class GASSystemModel(DeviceModel):
     """Model class for a global alignment system device."""
 
-    DEVICE_TYPE = "GAS_system"
+    DEVICE_TYPE_NAME = "GAS_system"
     TYPE_NODE_ID = "placeholder_gas"
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a PositionerModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
 
 class PointingSystemModel(DeviceModel):
     """Model class for a telescope pointing system device."""
 
-    DEVICE_TYPE = "Pointing_system"
+    DEVICE_TYPE_NAME = "Pointing_system"
     TYPE_NODE_ID = "placeholder_pointing"
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a PointingSystemModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
 
 class PositionerModel(DeviceModel):
     """Model class for a telescope positioner device."""
 
-    DEVICE_TYPE = "Positioner"
+    DEVICE_TYPE_NAME = "Positioner"
     TYPE_NODE_ID = "placeholder_positioner"
 
-    def __init__(self, obj_node, opcua_client, socketio_server,
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods={}):
         """Instantiate a PositionerModel instance."""
-        super().__init__(obj_node, opcua_client, socketio_server,
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
 
 # Set of node ids for type nodes corresponding to all implemented DeviceModel
 # subclasses plus folder type nodes.
-VALID_NODE_TYPES = {subcls.TYPE_NODE_ID
-                    for subcls in DeviceModel.__subclasses__()}.union(
-                        {DeviceModel.FOLDER_TYPE_NODE_ID})
+VALID_NODE_TYPE_IDS = {subcls.TYPE_NODE_ID
+                       for subcls in DeviceModel.__subclasses__()}.union(
+                           {DeviceModel.FOLDER_TYPE_NODE_ID})
