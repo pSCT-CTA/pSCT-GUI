@@ -214,7 +214,7 @@ class DeviceModel(ABC):
         subclasses = {subcls.TYPE_NODE_ID: subcls
                       for subcls in DeviceModel.__subclasses__()}
 
-        type_node_id = obj_node.get_type_definition().node_id
+        type_node_id = obj_node.get_type_definition().to_string()
         if type_node_id in subclasses:
             model_class = subclasses[type_node_id]
         else:

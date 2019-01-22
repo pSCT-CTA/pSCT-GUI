@@ -106,7 +106,7 @@ class BackendServer(object):
     # Function to recursively traverse node tree
     def __traverse_node(self, node, parent_model):
 
-        node_type = self._opcua_client.get_node(
+        node_type = self.opcua_client.get_node(
             self._obj_node.get_type_definition())
 
         if node_type.nodeid == device_models.DeviceModel.FOLDER_TYPE_NODE_ID:
@@ -161,8 +161,8 @@ class TestBackendServer(BackendServer):
             logger.info("Client connected: {}".format(sid))
             self.sio_clients.append(sid)
 
-        @self.sio.on('initialize')
-        def on_initialize(self, sid, data):
+        @self.sio.on('request_initial_data')
+        def on_request_initial_data(self, sid, data):
             component_name = data['component_name']
             for nodeid in data['device_ids']:
                 device_model = self.device_models[nodeid]
@@ -218,7 +218,7 @@ class TestBackendServer(BackendServer):
 
     def _initialize_device_models(self):
         logger.info("Creating device model...")
-        node_type = self._opcua_client.get_node(
+        node_type = self.opcua_client.get_node(
             self.panel_node.get_type_definition())
         model = device_models.DeviceModel.create(
             self.panel_node, self.opcua_client, parents=[])
