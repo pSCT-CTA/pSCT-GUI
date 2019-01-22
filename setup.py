@@ -17,7 +17,6 @@ setup(
     long_description='',
     classifiers=[
         'Programming Language :: Python',
-        'Framework :: Pyramid',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
     ],
@@ -29,9 +28,9 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-          'opcua==0.98.5',
-          'gevent==1.3.6',
-          'gevent_socketio==0.3.6'
+          'opcua>=0.98.5',
+          'eventlet>=0.24.1',
+          'python_socketio>=2.0.0'
      ],
     extras_require={
         'testing': tests_require,
