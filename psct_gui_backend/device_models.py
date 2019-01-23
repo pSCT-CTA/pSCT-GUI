@@ -263,8 +263,8 @@ class DeviceModel(ABC):
         return [c for l in self.children.values() for c in l]
 
     def set_data(self, name, value):
-        varient = opcua.ua.DataValue(opcua.ua.Variant(value))
-        self._data_nodes[name].set_value(varient)
+        variant = opcua.ua.DataValue(opcua.ua.Variant(value))
+        self._data_nodes[name].set_value(variant)
         logger.info("Data node [{}] set to: {}".format(name, value))
 
     def set_error(self, name, value):

@@ -171,9 +171,9 @@ class TestBackendServer(BackendServer):
         logger.info("{} device models created.".format(
             len(self.device_models)))
 
-        for device_model in self.device_models.values():
-            device_model.start_subscriptions()
-            logger.info("Subscriptions started.")
+        #for device_model in self.device_models.values():
+        #    device_model.start_subscriptions()
+        #logger.info("Subscriptions started.")
 
 
 if __name__ == "__main__":
