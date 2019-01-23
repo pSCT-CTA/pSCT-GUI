@@ -2,6 +2,8 @@
 from abc import ABC, abstractmethod
 import logging
 import threading
+import pprint
+import opcua
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +58,8 @@ class SubHandler(object):
         value = data.monitored_item.Value.Value.Value
         d[name] = value
 
-        logger.info("OPC UA: Data change - {} : {} : {} : {}".format(
-            self._device_model.id, type, name, value))
+        #logger.info("OPC UA: Data change - {} : {} : {} : {}".format(
+        #    self._device_model.id, type, name, value))
         try:
             self._socketio_server.emit('data_change', {
                 'device_id': self._device_model.id,
@@ -169,6 +171,7 @@ class DeviceModel(ABC):
                 [DeviceModel.ERROR_NODE_BROWSE_NAME]).get_variables()
             self._error_nodes = {node.get_display_name().to_string(): node
                                  for node in _error_nodes}
+
         except Exception:
             self._error_nodes = {}
 
@@ -260,11 +263,13 @@ class DeviceModel(ABC):
         return [c for l in self.children.values() for c in l]
 
     def set_data(self, name, value):
-        self._data_nodes[name].set_value(value)
+        varient = opcua.ua.DataValue(opcua.ua.Variant(value))
+        self._data_nodes[name].set_value(varient)
         logger.info("Data node [{}] set to: {}".format(name, value))
 
     def set_error(self, name, value):
-        self._error_nodes[name].set_value(value)
+        variant = opcua.ua.DataValue(opcua.ua.Variant(value))
+        self._error_nodes[name].set_value(variant)
         logger.info("Error node [{}] set to: {}".format(name, value))
 
     def send_initial_data(self, sid):
@@ -366,7 +371,7 @@ class DeviceModel(ABC):
                 self._busy = True
                 return_values = self._obj_node.call_method(
                     self.methods[method_name], *args)
-                logger.info('{}'.format(return_values))
+                logger.info(pprint.pformat(return_values))
                 try:
                     self._socketio_server.emit('method_return', {
                         'device_id': self.id,

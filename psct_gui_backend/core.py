@@ -157,7 +157,7 @@ class BackendServer(object):
 class TestBackendServer(BackendServer):
     def initialize_device_models(self, device_node_paths):
         logger.info("Creating device models...")
-        for path in self._device_node_paths:
+        for path in device_node_paths:
             node = self.opcua_client.get_objects_node().get_child(path)
             node_type = self.opcua_client.get_node(node.get_type_definition())
             model = device_models.DeviceModel.create(
@@ -169,7 +169,7 @@ class TestBackendServer(BackendServer):
                     node_type, node.nodeid))
 
         logger.info("{} device models created.".format(
-            self.device_models.length))
+            len(self.device_models)))
 
         for device_model in self.device_models.values():
             device_model.start_subscriptions()
