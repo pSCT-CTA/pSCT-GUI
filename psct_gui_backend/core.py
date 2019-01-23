@@ -30,9 +30,7 @@ class BackendServer(object):
 
     def __init__(self,
                  opcua_client,
-                 socketio_server,
-                 opcua_device_tree_node_name="2:DeviceTree",
-                 stop_method_id="2:Stop"):
+                 socketio_server):
         """Instantiate a BackendServer instance."""
         self.opcua_client = opcua_client
         self.sio = socketio_server
@@ -40,15 +38,19 @@ class BackendServer(object):
 
         self.device_models = {}
 
-        self.opcua_device_tree_node_name = opcua_device_tree_node_name
-
-        # Setup server connect and disconnect responses
         @self.sio.on('connect')
         def on_connect(sid, environ):
             logger.info("Client connected: {}".format(sid))
             self.sio_clients.append(sid)
-            for nodeid, device_model in self.device_models:
-                device_model.send_initial_data(sid)
+
+        @self.sio.on('request_initial_data')
+        def on_request_initial_data(self, sid, data):
+            component_name = data['component_name']
+            for nodeid in self.device_models:
+                device_model = self.device_models[nodeid]
+                device_model.send_initial_data(sid, component_name)
+            logger.info('Initialization data sent for component {}.'.format(
+                component_name))
 
         @self.sio.on('disconnect')
         def on_disconnect(sid):
@@ -68,21 +70,26 @@ class BackendServer(object):
             else:
                 self.device_models[device_id].call_method(method_name, args)
 
+        @self.sio.on('set_value')
+        def on_set_value(self, sid, data):
+            device_id = data['device_id']
+            type = data['type']
+            name = data['name']
+            value = data['value']
 
-        """Connect to OPC UA server, create device models, and wait."""
+            logger.info(
+                ("Set value request for device: {}, type: {}, ".format(
+                    device_id, type))
+                (" name: {}, value: {}".format(name, value)))
+
+            if type == 'data':
+                self.device_models[device_id].set_data(name, value)
+            elif type == 'error':
+                self.device_models[device_id].set_error(name, value)
+
         logger.info("Connecting to OPC UA server and loading type defs... ")
         self.opcua_client.connect()
         self.opcua_client.load_type_definitions()
-
-        self.device_tree_root_node = (
-            self.opcua_client.get_objects_node().get_child(
-                self.opcua_device_tree_node_name))
-
-        # First, recurse through node tree to identify all devices
-        # and their relationships
-        self._initialize_device_models()
-        for nodeid, device_model in self.device_models:
-            device_model.start_subscriptions()
 
     def __del__(self):
         """Destroy a BackendServer instance."""
@@ -98,10 +105,16 @@ class BackendServer(object):
         logger.info("Disconnecting OPC UA client...")
         self.opcua_client.disconnect()
 
-    def _initialize_device_models(self):
+    def initialize_device_models(self, opcua_device_tree_node_name):
         logger.info("Creating device models...")
-        for node in self.device_tree_root_node.get_children():
+        device_tree_root_node = (
+            self.opcua_client.get_objects_node().get_child(
+                opcua_device_tree_node_name))
+        for node in device_tree_root_node.get_children():
             self.__traverse_node(node, None)
+
+        for nodeid, device_model in self.device_models:
+            device_model.start_subscriptions()
 
     # Function to recursively traverse node tree
     def __traverse_node(self, node, parent_model):
@@ -142,91 +155,25 @@ class BackendServer(object):
 
 
 class TestBackendServer(BackendServer):
-    def __init__(self,
-                 opcua_client,
-                 socketio_server,
-                 panel_node_name="2:Panel_2111",
-                 stop_method_id="2:Stop"):
-        """Instantiate a BackendServer instance."""
-        self.opcua_client = opcua_client
-        self.sio = socketio_server
-        self.sio_clients = []
+    def initialize_device_models(self, device_node_paths):
+        logger.info("Creating device models...")
+        for path in self._device_node_paths:
+            node = self.opcua_client.get_objects_node().get_child(path)
+            node_type = self.opcua_client.get_node(node.get_type_definition())
+            model = device_models.DeviceModel.create(
+                node, self.opcua_client)
+            self.device_models[node.nodeid.to_string()] = model
 
-        self.device_models = {}
+            logger.info(
+                "Created device model with type {}, node id {}.".format(
+                    node_type, node.nodeid))
 
-        self.panel_node_name = panel_node_name
+        logger.info("{} device models created.".format(
+            self.device_models.length))
 
-        @self.sio.on('connect')
-        def on_connect(sid, environ):
-            logger.info("Client connected: {}".format(sid))
-            self.sio_clients.append(sid)
-
-        @self.sio.on('request_initial_data')
-        def on_request_initial_data(self, sid, data):
-            component_name = data['component_name']
-            for nodeid in data['device_ids']:
-                device_model = self.device_models[nodeid]
-                device_model.send_initial_data(sid, component_name)
-            logger.info('Initialization data sent for component {}.'.format(
-                component_name))
-
-        @self.sio.on('disconnect')
-        def on_disconnect(sid):
-            logger.info("Client disconnected: {}".format(sid))
-
-        @self.sio.on('call_method')
-        def on_call_method(self, sid, data):
-            device_id = data['device_id']
-            method_name = data['method_name']
-            args = data['args']
-
-            logger.info("Call request for method: {} on device ID: {}.".format(
-                method_name, device_id))
-
-            if method_name == "stop":
-                self.device_models[device_id].call_stop()
-            else:
-                self.device_models[device_id].call_method(method_name, args)
-
-        """Connect to OPC UA server, create device models, and wait."""
-        logger.info("Connecting to OPC UA server on and loading type defs... ")
-        self.opcua_client.connect()
-        self.opcua_client.load_type_definitions()
-
-        self.panel_node = (
-            self.opcua_client.get_objects_node().get_child(
-                self.panel_node_name))
-        logger.info("Located panel node.")
-
-        # First, recurse through node tree to identify all devices
-        # and their relationships
-        self._initialize_device_models()
-        logger.info("Device models initialized.")
         for device_model in self.device_models.values():
             device_model.start_subscriptions()
             logger.info("Subscriptions started.")
-    
-    def stop(self):
-        """Stop and disconnect OPC UA client."""
-        logger.info("Disconnecting all socketio clients...")
-        while self.sio_clients:
-            sid = self.sio_clients.pop()
-            self.sio.disconnect(sid)
-            logger.info("Client {} disconnected.".format(sid))
-        logger.info("Disconnecting OPC UA client...")
-        self.opcua_client.disconnect()
-
-    def _initialize_device_models(self):
-        logger.info("Creating device model...")
-        node_type = self.opcua_client.get_node(
-            self.panel_node.get_type_definition())
-        model = device_models.DeviceModel.create(
-            self.panel_node, self.opcua_client)
-        self.device_models[self.panel_node.nodeid.to_string()] = model
-
-        logger.info("Created device model with type {}, node id {}.".format(
-            node_type, self.panel_node.nodeid
-        ))
 
 
 if __name__ == "__main__":
@@ -249,7 +196,10 @@ if __name__ == "__main__":
     sio = socketio.Server()
 
     # serv = BackendServer(opcua_client, sio)
+    # serv.initialize_device_models("2:DeviceTree")
+
     serv = TestBackendServer(opcua_client, sio)
+    serv.initialize_device_models(["2:Panel_2111"])
 
     # app = socketio.Middleware(sio)
     # eventlet.wsgi.server(eventlet.listen(('', 8000)), app)

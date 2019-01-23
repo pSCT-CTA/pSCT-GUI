@@ -132,7 +132,7 @@ class DeviceModel(ABC):
 
         if socketio_server:
             self._socketio_server = socketio_server
-        
+
         self._sub_handler = SubHandler(self)
         self._subscriptions = {}
 
@@ -258,6 +258,14 @@ class DeviceModel(ABC):
     def all_children(self):
         """list of DeviceModel: Flat list of all children devices."""
         return [c for l in self.children.values() for c in l]
+
+    def set_data(self, name, value):
+        self._data_nodes[name].set_value(value)
+        logger.info("Data node [{}] set to: {}".format(name, value))
+
+    def set_error(self, name, value):
+        self._error_nodes[name].set_value(value)
+        logger.info("Error node [{}] set to: {}".format(name, value))
 
     def send_initial_data(self, sid):
         """Send data describing this device to a client browser via socketio.
