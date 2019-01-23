@@ -6,7 +6,7 @@ import socketio
 import eventlet
 import opcua
 
-from psct_gui.backend import device_models
+from psct_gui_backend import device_models
 
 logger = logging.getLogger(__name__)
 
@@ -202,10 +202,10 @@ class TestBackendServer(BackendServer):
         # and their relationships
         self._initialize_device_models()
         logger.info("Device models initialized.")
-        for nodeid, device_model in self.device_models:
+        for device_model in self.device_models.values():
             device_model.start_subscriptions()
             logger.info("Subscriptions started.")
-
+    
     def stop(self):
         """Stop and disconnect OPC UA client."""
         logger.info("Disconnecting all socketio clients...")
@@ -221,8 +221,8 @@ class TestBackendServer(BackendServer):
         node_type = self.opcua_client.get_node(
             self.panel_node.get_type_definition())
         model = device_models.DeviceModel.create(
-            self.panel_node, self.opcua_client, parents=[])
-        self.device_models[self.panel_node.nodeid] = model
+            self.panel_node, self.opcua_client)
+        self.device_models[self.panel_node.nodeid.to_string()] = model
 
         logger.info("Created device model with type {}, node id {}.".format(
             node_type, self.panel_node.nodeid

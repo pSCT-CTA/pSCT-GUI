@@ -58,12 +58,14 @@ class SubHandler(object):
 
         logger.info("OPC UA: Data change - {} : {} : {} : {}".format(
             self._device_model.id, type, name, value))
-        if self._socketio_server:
+        try:
             self._socketio_server.emit('data_change', {
                 'device_id': self._device_model.id,
                 'type': type,
                 'name': name,
                 'value': value})
+        except:
+            pass
 
     def event_notification(self, event):
         """Call a callback function on an event in a monitored node."""
@@ -128,20 +130,19 @@ class DeviceModel(ABC):
         self._opcua_client = opcua_client
         self._sub_periods = sub_periods
 
-        self._exit = threading.Event()
-
         if socketio_server:
             self._socketio_server = socketio_server
-            self._sub_handler = SubHandler(self)
-            self._subscriptions = {}
+        
+        self._sub_handler = SubHandler(self)
+        self._subscriptions = {}
 
         # OPC UA object node, node name, node id, node object type
         self._obj_node = obj_node
         self._type_node = self._opcua_client.get_node(
             self._obj_node.get_type_definition())
 
-        self._id = self._obj_node.node_id
-        self._name = self._obj_node.get_display_name()
+        self._id = self._obj_node.nodeid.to_string()
+        self._name = self._obj_node.get_display_name().to_string()
         self._device_type_name = self.DEVICE_TYPE_NAME
         self._node_type_name = self._type_node.get_display_name()
 
@@ -172,7 +173,7 @@ class DeviceModel(ABC):
             self._error_nodes = {}
 
         self._method_names_to_ids = {
-            node.get_display_name().to_string(): node.node_id
+            node.get_display_name().to_string(): node.nodeid
             for node in self._obj_node.get_methods()}
 
         # Dictionaries mapping node objects to node names
@@ -280,9 +281,11 @@ class DeviceModel(ABC):
         }
         logger.info("Device {}: Initial Data: {}".format(
             self.name, initial_data))
-        if self._socketio_server:
+        try:
             self._socketio_server.emit('initial_data', room=sid,
                                        data=initial_data)
+        except:
+            pass
 
     def start_subscriptions(self):
         """Add a DeviceModel as a child of this device.
@@ -331,7 +334,7 @@ class DeviceModel(ABC):
         child.parents.append(self)
 
     # Calls an object method and returns its return value
-    def call_method(self, method_name, args):
+    def call_method(self, method_name, *args):
         """Call a method from the OPC UA device.
 
         Calls the method in a separate thread to allow a concurrent call to
@@ -354,13 +357,16 @@ class DeviceModel(ABC):
             if method_name in self.methods:
                 self._busy = True
                 return_values = self._obj_node.call_method(
-                    self.methods[method_name], args)
-                if self._socketio_server:
+                    self.methods[method_name], *args)
+                logger.info('{}'.format(return_values))
+                try:
                     self._socketio_server.emit('method_return', {
                         'device_id': self.id,
                         'method_name': method_name,
                         'args': args,
                         'return_values': return_values})
+                except:
+                    pass
                 self._busy = False
 
                 return return_values
@@ -371,20 +377,21 @@ class DeviceModel(ABC):
         else:
             logger.warning("Device {} busy. Method call {} blocked.".format(
                 self.name, method_name))
-            if self._socketio_server:
+            try:
                 self._socketio_server.emit('device_busy', {
                     'device_id': self.id,
                     'method_name': method_name})
-
+            except:
+                pass
         return False
 
-    def call_method_background(self, method_name, args):
+    def call_method_background(self, method_name, *args):
         if not self._busy:
             if method_name in self.methods:
                 self._busy = True
                 thread = threading.Thread(
                     target=self._call_method,
-                    args=(self.methods[method_name], args))
+                    args=(self.methods[method_name], *args))
                 thread.start()
             else:
                 logger.error("Method name {} not found in device {}.".format(
@@ -393,34 +400,39 @@ class DeviceModel(ABC):
         else:
             logger.warning("Device {} busy. Method call {} blocked.".format(
                 self.name, method_name))
-            if self._socketio_server:
+            try:
                 self._socketio_server.emit('device_busy', {
                     'device_id': self.id,
                     'method_name': method_name})
-
+            except:
+                pass
         return False
 
-    def _call_method(self, method_name, args):
+    def _call_method(self, method_name, *args):
         return_values = self._obj_node.call_method(
-            self.methods[method_name], args)
+            self.methods[method_name], *args)
         logger.info("Device {} - Method {} returned. Return vals: {}".format(
             self.name, method_name, return_values))
         if self._busy:
-            if self._socketio_server:
+            try:
                 self._socketio_server.emit('method_return', {
                     'device_id': self.id,
                     'method_name': method_name,
                     'args': args,
                     'return_values': return_values})
+            except:
+                pass
             self._busy = False
 
     def call_stop(self):
         if self._busy:
             self._obj_node.call_method(self.methods['stop'], [])
             logger.info("Device {} - Stop called.".format(self.name))
-            if self._socketio_server:
+            try:
                 self._socketio_server.emit('method_stopped', {
                     'device_id': self.id})
+            except:
+                pass
             self._busy = False
 
 
@@ -486,7 +498,6 @@ class PanelModel(DeviceModel):
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
                          sub_periods=sub_periods)
-
         try:
             self.panel_number = self._obj_node.get_child(
                 [self.PANEL_NUMBER_NODE_NAME]).get_value()
@@ -500,7 +511,7 @@ class PanelModel(DeviceModel):
         self.ring_number = (self.panel_number // 10) % 10
         self.panel_type = self.mirror_indentifier + str(self.ring_number)
 
-        self.add_adjacent_panels()
+        # self.add_adjacent_panels()
 
         # More panel info describing geometry (?)
 
