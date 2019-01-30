@@ -6,7 +6,8 @@ import socketio
 import eventlet
 import opcua
 
-from psct_gui_backend import device_models
+from psct_gui_backend.OPCUA_device_models import (OPCUADeviceModel,
+                                                  VALID_NODE_TYPE_IDS)
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ class BackendServer(object):
         node_type = self.opcua_client.get_node(
             self._obj_node.get_type_definition())
 
-        if node_type.nodeid == device_models.DeviceModel.FOLDER_TYPE_NODE_ID:
+        if node_type.nodeid == OPCUADeviceModel.FOLDER_TYPE_NODE_ID:
             recurse = True
             new_parent = parent_model
         else:
@@ -133,7 +134,7 @@ class BackendServer(object):
             else:
                 logger.info("Creating device model with id: {}".format(
                     node.nodeid))
-                model = device_models.DeviceModel.create(
+                model = OPCUADeviceModel.create(
                     node, self.opcua_client)
                 self.device_models[node.nodeid] = model
                 recurse = True
@@ -148,7 +149,7 @@ class BackendServer(object):
         if recurse and children:
             for child in children:
                 type_node_id = child.get_type_definition().to_string()
-                if type_node_id in device_models.VALID_NODE_TYPES:
+                if type_node_id in VALID_NODE_TYPE_IDS:
                     self.__traverse_node(child, new_parent)
 
         return model
@@ -157,10 +158,10 @@ class BackendServer(object):
 class TestBackendServer(BackendServer):
     def initialize_device_models(self, device_node_paths):
         logger.info("Creating device models...")
-        for path in device_node_paths:
+        for path in self._device_node_paths:
             node = self.opcua_client.get_objects_node().get_child(path)
             node_type = self.opcua_client.get_node(node.get_type_definition())
-            model = device_models.DeviceModel.create(
+            model = OPCUADeviceModel.create(
                 node, self.opcua_client)
             self.device_models[node.nodeid.to_string()] = model
 
@@ -169,11 +170,11 @@ class TestBackendServer(BackendServer):
                     node_type, node.nodeid))
 
         logger.info("{} device models created.".format(
-            len(self.device_models)))
+            self.device_models.length))
 
-        #for device_model in self.device_models.values():
-        #    device_model.start_subscriptions()
-        #logger.info("Subscriptions started.")
+        for device_model in self.device_models.values():
+            device_model.start_subscriptions()
+        logger.info("Subscriptions started.")
 
 
 if __name__ == "__main__":
