@@ -130,7 +130,7 @@ class OPCUADeviceModel(BaseDeviceModel):
                  socketio_server=None,
                  sub_periods={}):
         """Instantiate a OPCUADeviceModel instance."""
-        super(socketio_server=socketio_server)
+        super().__init__(socketio_server=socketio_server)
         self._opcua_client = opcua_client
         self._sub_periods = sub_periods
 

@@ -1,6 +1,7 @@
 """Module for backend OPC UA-socket.io server thread."""
 import logging
 import argparse
+import sys
 
 import socketio
 import eventlet
@@ -9,7 +10,12 @@ import opcua
 from psct_gui_backend.OPCUA_device_models import (OPCUADeviceModel,
                                                   VALID_NODE_TYPE_IDS)
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('psct_gui_backend')
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class BackendServer(object):
@@ -158,7 +164,7 @@ class BackendServer(object):
 class TestBackendServer(BackendServer):
     def initialize_device_models(self, device_node_paths):
         logger.info("Creating device models...")
-        for path in self._device_node_paths:
+        for path in device_node_paths:
             node = self.opcua_client.get_objects_node().get_child(path)
             node_type = self.opcua_client.get_node(node.get_type_definition())
             model = OPCUADeviceModel.create(
@@ -169,8 +175,7 @@ class TestBackendServer(BackendServer):
                 "Created device model with type {}, node id {}.".format(
                     node_type, node.nodeid))
 
-        logger.info("{} device models created.".format(
-            self.device_models.length))
+        logger.info("{} device models created.".format(len(self.device_models)))
 
         for device_model in self.device_models.values():
             device_model.start_subscriptions()
@@ -185,14 +190,15 @@ if __name__ == "__main__":
                         help="IP address/port for the OPC UA aggregating "
                         "server")
     parser.add_argument('--debug',
-                        help="IP address/port for the OPC UA aggregating",
+                        help="",
                         action="store_true")
 
     args = parser.parse_args()
 
     if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
 
+    logger.info("Starting OPC UA client for address {}".format(args.opcua_server_address))
     opcua_client = opcua.Client(args.opcua_server_address, timeout=60)
     sio = socketio.Server()
 
@@ -202,5 +208,5 @@ if __name__ == "__main__":
     serv = TestBackendServer(opcua_client, sio)
     serv.initialize_device_models(["2:Panel_2111"])
 
-    # app = socketio.Middleware(sio)
-    # eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
+    app = socketio.Middleware(sio)
+    eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
