@@ -130,7 +130,7 @@ class OPCUADeviceModel(BaseDeviceModel):
                  socketio_server=None,
                  sub_periods={}):
         """Instantiate a OPCUADeviceModel instance."""
-        super(socketio_server=socketio_server)
+        super().__init__(socketio_server=socketio_server)
         self._opcua_client = opcua_client
         self._sub_periods = sub_periods
 
@@ -474,9 +474,9 @@ class PanelModel(OPCUADeviceModel):
             mirror_identifier = 'S'
         self.ring_number = self.panel_number[1]
         if self.ring_number == '1':
-            self.ring == 'inner'
+            self.ring = 'inner'
         elif self.ring_number == '2':
-            self.ring == 'outer'
+            self.ring = 'outer'
 
         self.panel_type = mirror_identifier + self.ring_number
 
