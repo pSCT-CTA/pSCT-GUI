@@ -150,9 +150,6 @@ class OPCUADeviceModel(BaseDeviceModel):
         self._device_type_name = self.DEVICE_TYPE_NAME
         self._node_type_name = self._type_node.get_display_name()
 
-        self.children = {}
-        self.parents = []
-
         # Flag indicating whether a method is being executed
         # (only 1 allowed concurrently)
         self._busy = False
@@ -474,9 +471,9 @@ class PanelModel(OPCUADeviceModel):
             mirror_identifier = 'S'
         self.ring_number = self.panel_number[1]
         if self.ring_number == '1':
-            self.ring == 'inner'
+            self.ring = 'inner'
         elif self.ring_number == '2':
-            self.ring == 'outer'
+            self.ring = 'outer'
 
         self.panel_type = mirror_identifier + self.ring_number
 

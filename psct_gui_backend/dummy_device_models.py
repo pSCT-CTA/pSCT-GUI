@@ -4,6 +4,8 @@ import logging
 import threading
 import pprint
 import opcua
+import random
+import time
 
 from psct_gui_backend.device_models import BaseDeviceModel
 
@@ -50,7 +52,7 @@ class DummyDeviceModel(BaseDeviceModel):
 
         """
         subclasses = {subcls.TYPE_NODE_ID: subcls
-                      for subcls in DeviceModel.__subclasses__()}
+                      for subcls in DummyDeviceModel.__subclasses__()}
 
         type_node_id = obj_node.get_type_definition().to_string()
         if type_node_id in subclasses:
@@ -113,6 +115,27 @@ class DummyDeviceModel(BaseDeviceModel):
     def _stop(self):
         pass
 
+    def generate_dummy_data(self, type, name, mean=10.0, stddev=1.0,
+                            min_time=1.0, max_time=2.0):
+        while True:
+            if type == "data":
+                type_dict = self._data
+            elif type == "error":
+                type_dict = self._errors
+            else:
+                raise ValueError("Invalid type {}".format(type))
+
+            if name in dict:
+                type_dict[name] = random.gauss(mean, stddev)
+
+            self._socketio_server.emit('data_change', {
+                'device_id': self._device_model.id,
+                'type': type,
+                'name': name,
+                'value': type_dict[name]})
+
+            time.sleep(random.uniform(min_time, max_time))
+
 
 class DummyTelescopeModel(DummyDeviceModel):
     """Dummy model class for a telescope device."""
@@ -137,8 +160,67 @@ class DummyPanelModel(DummyDeviceModel):
 
     DEVICE_TYPE_NAME = "Panel"
 
-    def __init__(self, socketio_server=None):
+    def __init__(self, panel_number, initial_data=None, socketio_server=None):
         super().__init__(socketio_server=socketio_server)
+
+        logger.info("Creating dummy panel with ID {}".format(panel_number))
+
+        self.panel_number = panel_number
+
+        if self.panel_number[0] == '1':
+            self.mirror = 'primary'
+            mirror_identifier = 'P'
+        elif self.panel_number[0] == '2':
+            self.mirror = 'secondary'
+            mirror_identifier = 'S'
+        self.ring_number = self.panel_number[1]
+        if self.ring_number == '1':
+            self.ring = 'inner'
+        elif self.ring_number == '2':
+            self.ring = 'outer'
+
+        self.panel_type = mirror_identifier + self.ring_number
+
+        self._position_info = {
+            'panel_number': self.panel_number,
+            'mirror': self.mirror,
+            'ring': self.ring,
+            'panel_type': self.panel_type
+        }
+
+        self._id = panel_number
+        self._name = "Panel " + panel_number
+        self._position_info = {}
+
+        if initial_data:
+            self._data = initial_data
+        else:
+            self._data = {
+                'State': 0,
+                'curCoords_x': -3.5,
+                'curCoords_y': 3.1,
+                'curCoords_z': 608.9,
+                'curCoords_xRot': -4.4,
+                'curCoords_yRot': -0.5,
+                'curCoords_zRot': 2.1,
+                'inCoords_x': -3.5,
+                'inCoords_y': 3.1,
+                'inCoords_z': 608.9,
+                'inCoords_xRot': -4.4,
+                'inCoords_yRot': -0.5,
+                'inCoords_zRot': 2.1,
+                'InternalTemperature': 20.84,
+                'ExternalTemperature': 34.81
+                }
+        logger.info("Set initial data.")
+
+        thread1 = threading.Thread(target=self.generate_dummy_data, args=("data", "InternalTempearture"), kwargs={'mean': 20.0})
+        thread1.daemon = True
+        thread1.start()
+        thread2 = threading.Thread(target=self.generate_dummy_data, args=("data", "ExternalTemperature"), kwargs={'mean': 34.0})
+        thread2.daemon = True
+        thread2.start()
+        logger.info("Started dummy data generation threads.")
 
 
 class DummyEdgeModel(DummyDeviceModel):
