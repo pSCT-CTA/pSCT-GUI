@@ -1,13 +1,22 @@
 """Module for backend OPC UA-socket.io server thread."""
 import logging
 import argparse
+import sys
 
 import socketio
+import aiohttp
 import eventlet
+import gevent
+import geventwebsocket
 
 from psct_gui_backend.dummy_device_models import DummyPanelModel
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('psct_gui_backend')
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class DummyBackendServer:
@@ -24,14 +33,24 @@ class DummyBackendServer:
             logger.info("Client connected: {}".format(sid))
             self.sio_clients.append(sid)
 
-        @self.sio.on('request_initial_data')
-        def on_request_initial_data(self, sid, data):
+        @self.sio.on('request_all_data')
+        def on_request_all_data(self, sid, data):
+            all_data = {}
             component_name = data['component_name']
-            for nodeid in self.device_models:
-                device_model = self.device_models[nodeid]
-                device_model.send_initial_data(sid, component_name)
-            logger.info('Initialization data sent for component {}.'.format(
+            devices_by = data['devices_by']
+            if devices_by == "types":
+                for type in data['types']:
+                    for id, device_model in types:
+                        all_data[type][id] = device_model.all_data
+            elif devices_by == "ids":
+                for id in data['ids']:
+                    device_model = self.device_models[id]
+                    all_data[id] = device_model.all_data
+
+            logger.info('All data sent for component {}.'.format(
                 component_name))
+
+            return all_data
 
         @self.sio.on('disconnect')
         def on_disconnect(sid):
@@ -86,7 +105,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
 
     sio = socketio.Server()
 
@@ -94,4 +113,4 @@ if __name__ == "__main__":
     serv.initialize_device_models()
 
     app = socketio.Middleware(sio)
-    eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
+    eventlet.wsgi.server(eventlet.listen(('', 5000)), app)

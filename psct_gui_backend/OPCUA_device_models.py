@@ -46,11 +46,11 @@ class SubHandler(object):
         # Determine whether node is an error node or data node
         if node in self._device_model._data_node_to_name:
             name = self._device_model._data_node_to_name[node]
-            type = 'data'
+            data_type = 'data'
             d = self._device_model.data
         elif node in self._device_model._error_node_to_name:
             name = self._device_model._error_node_to_name[node]
-            type = 'error'
+            data_type = 'error'
             d = self._device_model.errors
         else:
             raise ValueError("Node producing datachange notification cannot "
@@ -60,15 +60,14 @@ class SubHandler(object):
         value = data.monitored_item.Value.Value.Value
         d[name] = value
 
-        logger.debug("OPC UA: Data change - {} : {} : {} : {}".format(
-            self._device_model.id, type, name, value))
-
         if self._device_model._socketio_server:
             self._device_model._socketio_server.emit('data_change', {
                 'device_id': self._device_model.id,
-                'type': type,
+                'data_type': data_type,
                 'name': name,
                 'value': value})
+            logger.debug("OPC UA: Data change - {} : {} : {} : {}".format(
+                self._device_model.id, data_type, name, value))
 
     def event_notification(self, event):
         """Call a callback function on an event in a monitored node."""
@@ -326,7 +325,7 @@ class OPCUADeviceModel(BaseDeviceModel):
             if method_name in self.methods:
                 self._busy = True
                 return_values = self._obj_node.call_method(
-                    self.methods[method_name], *args)
+                    self._method_names_to_ids[method_name], *args)
                 logger.info(pprint.pformat(return_values))
                 if self._socketio_server:
                     self._socketio_server.emit('method_return', {
@@ -356,7 +355,7 @@ class OPCUADeviceModel(BaseDeviceModel):
                 self._busy = True
                 thread = threading.Thread(
                     target=self._call_method,
-                    args=(self.methods[method_name], *args))
+                    args=(method_name, *args))
                 thread.start()
             else:
                 logger.error("Method name {} not found in device {}.".format(
@@ -373,7 +372,7 @@ class OPCUADeviceModel(BaseDeviceModel):
 
     def _call_method(self, method_name, *args):
         return_values = self._obj_node.call_method(
-            self.methods[method_name], *args)
+            self._method_names_to_ids[method_name], *args)
         logger.info("Device {} - Method {} returned. Return vals: {}".format(
             self.name, method_name, return_values))
         if self._busy:
@@ -383,16 +382,15 @@ class OPCUADeviceModel(BaseDeviceModel):
                     'method_name': method_name,
                     'args': args,
                     'return_values': return_values})
-            self._busy = False
+                self._busy = False
 
     def call_stop(self):
-        if self._busy:
-            self._obj_node.call_method(self.methods['stop'], [])
-            logger.info("Device {} - Stop called.".format(self.name))
-            if self._socketio_server:
-                self._socketio_server.emit('method_stopped', {
-                    'device_id': self.id})
-            self._busy = False
+        self._obj_node.call_method(self._method_names_to_ids['Stop'])
+        logger.info("Device {} - Stop called.".format(self.name))
+        if self._socketio_server:
+            self._socketio_server.emit('method_stopped', {
+                'device_id': self.id})
+        self._busy = False
 
 
 class TelescopeModel(OPCUADeviceModel):
@@ -461,21 +459,27 @@ class PanelModel(OPCUADeviceModel):
             self.panel_number = self._obj_node.get_child(
                 [self.PANEL_NUMBER_NODE_NAME]).get_value()
         except Exception:
-            self.panel_number = self.name[-4:]
+            self.panel_number = self.name.split('_')[1]
 
-        if self.panel_number[0] == '1':
-            self.mirror = 'primary'
-            mirror_identifier = 'P'
-        elif self.panel_number[0] == '2':
-            self.mirror = 'secondary'
-            mirror_identifier = 'S'
-        self.ring_number = self.panel_number[1]
-        if self.ring_number == '1':
+        if self.panel_number[0] == '0':
+            self.mirror = 'other'
+            self.ring_number = '0'
+            self.panel_type = 'O0'
             self.ring = 'inner'
-        elif self.ring_number == '2':
-            self.ring = 'outer'
+        else:
+            if self.panel_number[0] == '1':
+                self.mirror = 'primary'
+                mirror_identifier = 'P'
+            elif self.panel_number[0] == '2':
+                self.mirror = 'secondary'
+                mirror_identifier = 'S'
+            self.ring_number = self.panel_number[2]
+            if self.ring_number == '1':
+                self.ring = 'inner'
+            elif self.ring_number == '2':
+                self.ring = 'outer'
 
-        self.panel_type = mirror_identifier + self.ring_number
+            self.panel_type = mirror_identifier + self.ring_number
 
         self._position_info = {
             'panel_number': self.panel_number,
@@ -496,6 +500,23 @@ class PanelModel(OPCUADeviceModel):
             for panel in edge_model.panels:
                 if panel != self:
                     self.adjacent_panels.append(panel)
+
+    def move_to_coords(self, x=None, y=None, z=None, x_rot=None, y_rot=None, z_rot=None):
+
+        for coord, name in [(x, 'inCoords_x'), (y, 'inCoords_y'),
+                            (z, 'inCoords_z'), (x_rot, 'inCoords_xRot'),
+                            (y_rot, 'inCoords_yRot'),
+                            (z_rot, 'inCoords_zRot')]:
+            if coord:
+                self.set_data(name, coord)
+
+        self.call_method_background('MoveToCoords')
+
+    def read(self):
+        self.call_method('Read')
+
+    def stop(self):
+        self.call_stop()
 
 
 class EdgeModel(OPCUADeviceModel):

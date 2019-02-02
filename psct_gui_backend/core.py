@@ -5,6 +5,7 @@ import sys
 
 import socketio
 import eventlet
+eventlet.monkey_patch()
 import opcua
 
 from psct_gui_backend.OPCUA_device_models import (OPCUADeviceModel,
@@ -44,55 +45,28 @@ class BackendServer(object):
         self.sio_clients = []
 
         self.device_models = {}
+        self.device_models_by_type = {}
 
         @self.sio.on('connect')
         def on_connect(sid, environ):
             logger.info("Client connected: {}".format(sid))
             self.sio_clients.append(sid)
 
-        @self.sio.on('request_initial_data')
-        def on_request_initial_data(self, sid, data):
-            component_name = data['component_name']
-            for nodeid in self.device_models:
-                device_model = self.device_models[nodeid]
-                device_model.send_initial_data(sid, component_name)
-            logger.info('Initialization data sent for component {}.'.format(
-                component_name))
-
         @self.sio.on('disconnect')
         def on_disconnect(sid):
             logger.info("Client disconnected: {}".format(sid))
 
+        @self.sio.on('request_all_data')
+        def on_request_all_data(sid, request_data):
+            return self._on_request_all_data(sid, request_data)
+
         @self.sio.on('call_method')
-        def on_call_method(self, sid, data):
-            device_id = data['device_id']
-            method_name = data['method_name']
-            args = data['args']
-
-            logger.info("Call request for method: {} on device ID: {}.".format(
-                method_name, device_id))
-
-            if method_name == "stop":
-                self.device_models[device_id].call_stop()
-            else:
-                self.device_models[device_id].call_method(method_name, args)
+        def on_call_method(sid, data):
+            self._on_call_method(sid, data)
 
         @self.sio.on('set_value')
-        def on_set_value(self, sid, data):
-            device_id = data['device_id']
-            type = data['type']
-            name = data['name']
-            value = data['value']
-
-            logger.info(
-                ("Set value request for device: {}, type: {}, ".format(
-                    device_id, type))
-                (" name: {}, value: {}".format(name, value)))
-
-            if type == 'data':
-                self.device_models[device_id].set_data(name, value)
-            elif type == 'error':
-                self.device_models[device_id].set_error(name, value)
+        def on_set_value(sid, data):
+            self._on_set_value(sid, data)
 
         logger.info("Connecting to OPC UA server and loading type defs... ")
         self.opcua_client.connect()
@@ -112,6 +86,56 @@ class BackendServer(object):
         logger.info("Disconnecting OPC UA client...")
         self.opcua_client.disconnect()
 
+    def _on_request_all_data(self, sid, request_data):
+        logger.info("Received all data request: {}".format(request_data))
+        all_data = {}
+        component_name = request_data['component_name']
+        devices_by = request_data['devices_by']
+        if devices_by == "types":
+            for type in request_data['types']:
+                all_data[type] = self.device_models_by_type[type]
+        elif devices_by == "ids":
+            for id in request_data['ids']:
+                device_model = self.device_models[id]
+                all_data[id] = device_model.all_data
+        elif devices_by == "all":
+            for id in self.device_models:
+                all_data[id] = self.device_models[id]
+
+        logger.info('All data sent for component {}.'.format(
+            component_name))
+
+        return all_data
+
+    def _on_call_method(self, sid, data):
+        device_id = data['device_id']
+        method_name = data['method_name']
+        args = data['args']
+
+        logger.info("Call request for method: {} on device ID: {}.".format(
+            method_name, device_id))
+
+        if method_name == "stop":
+            self.device_models[device_id].call_stop()
+        else:
+            self.device_models[device_id].call_method(method_name, args)
+
+    def _on_set_value(self, sid, data):
+        device_id = data['device_id']
+        type = data['type']
+        name = data['name']
+        value = data['value']
+
+        logger.info(
+            ("Set value request for device: {}, type: {}, ".format(
+                device_id, type))
+            (" name: {}, value: {}".format(name, value)))
+
+        if type == 'data':
+            self.device_models[device_id].set_data(name, value)
+        elif type == 'error':
+            self.device_models[device_id].set_error(name, value)
+
     def initialize_device_models(self, opcua_device_tree_node_name):
         logger.info("Creating device models...")
         device_tree_root_node = (
@@ -120,29 +144,32 @@ class BackendServer(object):
         for node in device_tree_root_node.get_children():
             self.__traverse_node(node, None)
 
-        for nodeid, device_model in self.device_models:
+        for device_model in self.device_models.values():
             device_model.start_subscriptions()
 
     # Function to recursively traverse node tree
     def __traverse_node(self, node, parent_model):
 
         node_type = self.opcua_client.get_node(
-            self._obj_node.get_type_definition())
+            node.get_type_definition())
 
-        if node_type.nodeid == OPCUADeviceModel.FOLDER_TYPE_NODE_ID:
+        if node_type.nodeid.to_string() == OPCUADeviceModel.FOLDER_TYPE_NODE_ID:
             recurse = True
             new_parent = parent_model
         else:
             # If node already seen, get corresponding model
-            if node.nodeid in self.device_models:
-                model = self.device_models[node.nodeid]
+            if node.nodeid.to_string() in self.device_models:
+                model = self.device_models[node.nodeid.to_string()]
                 recurse = False
             else:
                 logger.info("Creating device model with id: {}".format(
-                    node.nodeid))
+                    node.nodeid.to_string()))
                 model = OPCUADeviceModel.create(
-                    node, self.opcua_client)
-                self.device_models[node.nodeid] = model
+                    node, self.opcua_client, socketio_server=self.sio)
+                self.device_models[node.nodeid.to_string()] = model
+                if model.DEVICE_TYPE_NAME not in self.device_models_by_type:
+                    self.device_models_by_type[model.DEVICE_TYPE_NAME] = {}
+                self.device_models_by_type[model.DEVICE_TYPE_NAME][node.nodeid.to_string()] = model
                 recurse = True
 
             if parent_model:
@@ -154,14 +181,12 @@ class BackendServer(object):
         children = node.get_children(nodeclassmask=1)
         if recurse and children:
             for child in children:
-                type_node_id = child.get_type_definition().to_string()
+                type_node_id = (child.get_type_definition()).to_string()
                 if type_node_id in VALID_NODE_TYPE_IDS:
                     self.__traverse_node(child, new_parent)
 
-        return model
 
-
-class TestBackendServer(BackendServer):
+class OldBackendServer(BackendServer):
     def initialize_device_models(self, device_node_paths):
         logger.info("Creating device models...")
         for path in device_node_paths:
@@ -202,11 +227,11 @@ if __name__ == "__main__":
     opcua_client = opcua.Client(args.opcua_server_address, timeout=60)
     sio = socketio.Server()
 
-    # serv = BackendServer(opcua_client, sio)
-    # serv.initialize_device_models("2:DeviceTree")
+    serv = BackendServer(opcua_client, sio)
+    serv.initialize_device_models("2:DeviceTree")
 
-    serv = TestBackendServer(opcua_client, sio)
-    serv.initialize_device_models(["2:Panel_2111"])
+    #serv = OldBackendServer(opcua_client, sio)
+    #serv.initialize_device_models(["2:Panel_2111"])
 
     app = socketio.Middleware(sio)
-    eventlet.wsgi.server(eventlet.listen(('', 8000)), app)
+    eventlet.wsgi.server(eventlet.listen(('', 5000)), app)

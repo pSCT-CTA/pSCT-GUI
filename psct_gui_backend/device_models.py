@@ -74,32 +74,20 @@ class BaseDeviceModel(ABC):
     def set_error(self, name, value):
         pass
 
-    def send_initial_data(self, sid):
-        """Send data describing this device to a client browser via socketio.
-
-        Parameters
-        ----------
-        sid : str
-            Session ID of the client to send data to.
-
-        """
-        initial_data = {
+    @property
+    def all_data(self):
+        return {
             'device_id': self.id,
             'name': self.name,
             'type': self.type,
             'position_info': self.position_info,
             'data': self.data,
             'errors': self.errors,
-            'methods': self._method_names_to_ids,
+            'methods': self.methods,
             'children': {type: [model.id for model in self.children[type]]
                          for type in self.children},
             'parents': [model.id for model in self.parents]
         }
-        logger.info("Device {}: Initial Data: {}".format(
-            self.name, initial_data))
-        if self._socketio_server:
-            self._socketio_server.emit('initial_data', room=sid,
-                                       data=initial_data)
 
     def add_child(self, child):
         """Add a BaseDeviceModel as a child of this device.

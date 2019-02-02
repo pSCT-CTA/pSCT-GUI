@@ -2,8 +2,6 @@
 from abc import abstractmethod
 import logging
 import threading
-import pprint
-import opcua
 import random
 import time
 
@@ -125,14 +123,16 @@ class DummyDeviceModel(BaseDeviceModel):
             else:
                 raise ValueError("Invalid type {}".format(type))
 
-            if name in dict:
+            if name in type_dict:
                 type_dict[name] = random.gauss(mean, stddev)
 
             self._socketio_server.emit('data_change', {
-                'device_id': self._device_model.id,
+                'device_id': self.id,
                 'type': type,
                 'name': name,
                 'value': type_dict[name]})
+            logger.debug("Data change - {} : {} : {} : {}".format(
+                self.id, type, name, type_dict[name]))
 
             time.sleep(random.uniform(min_time, max_time))
 
@@ -173,7 +173,8 @@ class DummyPanelModel(DummyDeviceModel):
         elif self.panel_number[0] == '2':
             self.mirror = 'secondary'
             mirror_identifier = 'S'
-        self.ring_number = self.panel_number[1]
+
+        self.ring_number = self.panel_number[2]
         if self.ring_number == '1':
             self.ring = 'inner'
         elif self.ring_number == '2':
@@ -214,7 +215,7 @@ class DummyPanelModel(DummyDeviceModel):
                 }
         logger.info("Set initial data.")
 
-        thread1 = threading.Thread(target=self.generate_dummy_data, args=("data", "InternalTempearture"), kwargs={'mean': 20.0})
+        thread1 = threading.Thread(target=self.generate_dummy_data, args=("data", "InternalTemperature"), kwargs={'mean': 20.0})
         thread1.daemon = True
         thread1.start()
         thread2 = threading.Thread(target=self.generate_dummy_data, args=("data", "ExternalTemperature"), kwargs={'mean': 34.0})
