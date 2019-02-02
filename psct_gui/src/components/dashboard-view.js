@@ -13,6 +13,11 @@ import '../components/device-tree-widget.js';
 // Polymer elements
 
 class DashboardView extends PageViewElement {
+  constructor () {
+    super()
+    this.selectedDeviceID = "ns=2;s=Panel_0"
+  }
+
   render () {
     return html`
       ${PaperFontStyles}
@@ -28,10 +33,10 @@ class DashboardView extends PageViewElement {
         <div class="dashboard-body">
           <div class="flex-container">
             <div style="flex-grow: 6; height: 200%">
-              <device-tree-widget></device-tree-widget>
+              <device-tree-widget @changed-selected-device="${this.updateSelectedDevice}"></device-tree-widget>
             </div>
             <div style="flex-grow: 1; height: 200%">
-              <info-window-widget></info-window-widget>
+              <info-window-widget deviceID="${this.selectedDeviceID}"></info-window-widget>
             </div>
           </div>
           <div class="flex-container">
@@ -47,6 +52,16 @@ class DashboardView extends PageViewElement {
         </div>
       </section>
     `
+  }
+
+  updateSelectedDevice(e){
+    this.selectedDeviceID = e.deviceid
+  }
+
+  static get properties () {
+    return {
+      selectedDeviceID: { type: String }
+    }
   }
 }
 

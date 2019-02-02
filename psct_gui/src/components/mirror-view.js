@@ -9,6 +9,10 @@ import '../components/info-window-widget.js';
 import '../components/mirror-widget.js';
 
 class MirrorView extends PageViewElement {
+  constructor () {
+    super()
+    this.selectedDeviceID = null
+  }
 
   render () {
     return html`
@@ -32,13 +36,11 @@ class MirrorView extends PageViewElement {
       <div class="paper-font-display1 view-title">Mirrors</div>
       <div class="mirror-body">
         <div class="flex-container" class="mirror-container">
-          <div style="flex-grow: 8">
-            <mirror-widget></mirror-widget>
+          <div style="flex-grow: 6">
+            <mirror-widget @changed-selected-device="${this.updateSelectedDevice}"></mirror-widget>
           </div>
-        </div>
-        <div class="flex-container">
-          <div style="flex-grow: 8">
-            <info-window-widget></info-window-widget>
+          <div style="flex-grow: 2">
+            <info-window-widget deviceID="${this.selectedDeviceID}"></info-window-widget>
           </div>
         </div>
       </div>
@@ -46,8 +48,13 @@ class MirrorView extends PageViewElement {
     `
   }
 
-  static get properties() {
+  updateSelectedDevice(e){
+    this.selectedDeviceID = e.deviceid
+  }
+
+  static get properties () {
     return {
+      selectedDeviceID: { type: String }
     }
   }
 }

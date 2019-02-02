@@ -4,6 +4,7 @@ import { PaperFontStyles, WidgetStyles } from './shared-styles.js'
 
 import '@polymer/paper-card/paper-card.js';
 import '@polymer/iron-icons/iron-icons.js';
+import '@polymer/paper-icon-button/paper-icon-button.js';
 
 export class WidgetCard extends LitElement {
 
@@ -11,8 +12,7 @@ export class WidgetCard extends LitElement {
     super()
     this.name = "Widget"
     this.fullscreen = false
-    this.refreshing = false
-    this.reloading = false
+    this.loading = true
   }
 
   render() {
@@ -25,8 +25,8 @@ export class WidgetCard extends LitElement {
       </div>
       <div class="card-actions">
         ${this.actionsTemplate}
-        <iron-icon icon=${this.fullscreen? "fullscreen-exit": "fullscreen"} slot="item-icon" onclick="${this._fullscreenButtonClicked}"></iron-icon>
-        <iron-icon icon="refresh" slot="item-icon" onclick="${this._refreshButtonClicked}"></iron-icon>
+        <paper-icon-button icon=${this.fullscreen? "fullscreen-exit": "fullscreen"} title="fullscreen" @click="${this._fullscreenButtonClicked}"></paper-icon-button>
+        <paper-icon-button icon="refresh" slot="item-icon" @click="${this._refreshButtonClicked}" title="refresh"></paper-icon-button>
       </div>
     </paper-card>
     `;
@@ -57,8 +57,7 @@ export class WidgetCard extends LitElement {
     return {
       name: { type: String },
       fullscreen: { type: Boolean },
-      refreshing: { type: Boolean },
-      reloading: { type: Boolean }
+      loading: { type: Boolean }
     }
   }
 }

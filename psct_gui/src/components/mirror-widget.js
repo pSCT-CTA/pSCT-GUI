@@ -1,38 +1,60 @@
 import { LitElement, html } from '@polymer/lit-element';
 
 import { PaperFontStyles } from './shared-styles.js'
-
 import { WidgetCard } from './widget-card.js'
+import { BaseSocketioDeviceClient } from '../socketio-device-client.js'
 
 import * as d3 from "d3";
 
 import '@polymer/paper-button/paper-button.js';
 
+import '@polymer/paper-radio-button/paper-radio-button.js';
+import '@polymer/paper-radio-group/paper-radio-group.js';
+
+import '@polymer/paper-tooltip/paper-tooltip.js';
+
+class MirrorWidgetClient extends BaseSocketioDeviceClient {
+  constructor (address, component) {
+    super(address, component)
+  }
+
+  on_data_change(data) {
+    console.log(data)
+  }
+}
+
 class MirrorWidget extends WidgetCard {
   constructor() {
     super()
+    this.socketioClient = MirrorWidgetClient("http://localhost:5000", this)
     this.name = 'Mirror View'
-    this.mirror = "secondary"
+
+    this.mirror = "Secondary"
+    this._allMirrors = ["Primary", "Secondary", "Other"]
+
+    this.viewMode = "Internal Temperature"
+    this._allViewModes = ["Internal Temperature", "External Temperature"]
 
     this.width = 600
     this.height = 600
 
     // Hardcoded properties
     this.allPanelNumbers = {
-      P1: ['1114', '1113', '1112', '1111',
-        '1414', '1413', '1412', '1411',
+      P1: ['1414', '1413', '1412', '1411',
         '1314', '1313', '1312', '1311',
-        '1214', '1213', '1212', '1211'],
-      P2: ['1128', '1127', '1126', '1125', '1124', '1123', '1122', '1121',
-        '1428', '1427', '1426', '1425', '1424', '1423', '1422', '1421',
+        '1214', '1213', '1212', '1211',
+        '1114', '1113', '1112', '1111'],
+      P2: ['1428', '1427', '1426', '1425', '1424', '1423', '1422', '1421',
         '1328', '1327', '1326', '1325', '1324', '1323', '1322', '1321',
-        '1228', '1227', '1226', '1225', '1224', '1223', '1222', '1221'],
-      S1: ['2112', '2111', '2412', '2411',
-        '2312', '2311', '2212', '2211'],
-      S2: ['2124', '2123', '2122', '2121',
-        '2424', '2423', '2422', '2421',
+        '1228', '1227', '1226', '1225', '1224', '1223', '1222', '1221',
+        '1128', '1127', '1126', '1125', '1124', '1123', '1122', '1121'],
+      S1: ['2412', '2411','2312', '2311',
+        '2212', '2211',  '2112', '2111'],
+      S2: ['2424', '2423', '2422', '2421',
         '2324', '2323', '2322', '2321',
-        '2224', '2223', '2222', '2221']
+        '2224', '2223', '2222', '2221',
+        '2124', '2123', '2122', '2121'],
+      other: ['0']
     }
 
     this.panelGeometry = {
@@ -163,46 +185,71 @@ class MirrorWidget extends WidgetCard {
     if (this.mirror === 'primary') {
       this.innerPanelType = 'P1'
       this.outerPanelType = 'P2'
-      this.innerPanelNumbers = this.allPanelNumbers.P1
-      this.outerPanelNumbers = this.allPanelNumbers.P2
     } else if (this.mirror === 'secondary') {
       this.innerPanelType = 'S1'
       this.outerPanelType = 'S2'
-      this.innerPanelNumbers = this.allPanelNumbers.S1
-      this.outerPanelNumbers = this.allPanelNumbers.S2
+    } else if (this.mirror === 'other') {
+      this.innerPanelType = 'S1'
+      this.outerPanelType = 'S2'
     }
 
-    this.panels = []
-    this.panelPositions = {}
-
     this.computePositions()
-    this.computeScales()
+    this.computeXYScales()
+    this.computeTempScales()
+
+    this.socketioClient.connect()
+    this.socketioClient.request_all_data("types", ["Panel"])
   }
 
   computePositions () {
-    for (let z of [[this.innerPanelNumbers, this.innerPanelType], [this.outerPanelNumbers, this.outerPanelType]]) {
-      var numPanels = z[0].length
-      for (var i = 0; i < numPanels; i++) {
-        var panelNumber = z[0][i];
-        var panel = { panelNumber: panelNumber }
-        this.panelPositions[panelNumber] = {}
+    this.panelPositions = {}
+    for (let mirror of this._allMirrors) {
+      for (let panelType of [this.innerPanelType, this.outerPanelType]) {
+        var panelNumbers = this.allPanelNumbers[panelType]
+        var panelGeometry = this.panelGeometry[panelType]
 
-        var theta = 2 * Math.PI * ((i + 0.5) / numPanels)
+        for (var i = 0; i < panelNumbers.length; i++) {
+          var panelNumber = panelNumbers[i]
+          this.panelPositions[mirror][panelNumber] = {}
 
-        for (let coordinateType of ['vertices', 'referencePointsPanel', 'referencePointsBack']) {
-          var points = []
-          for (let point of this.panelGeometry[z[1]][coordinateType]) {
-            points.push(this._rotateCoords(point, theta))
+          var theta = 2 * Math.PI * ((i + 0.5) / panelNumbers.length)
+          for (let pointType of ['vertices', 'referencePointsPanel', 'referencePointsBack']) {
+            this.panelPositions[panelNumber][pointType] = panelGeometry[panelType][pointType].map(x => this._rotatePoint(x, theta))
           }
-          this.panelPositions[panelNumber][coordinateType] = points
-          panel[coordinateType] = points
         }
-        this.panels.push(panel)
       }
     }
   }
 
-  _rotateCoords (point, theta) {
+  setAllData(data) {
+    console.log("All data received.")
+    setPanelData(data.panels)
+    console.log("All data set.")
+  }
+
+  setPanelData(panelData) {
+    this.panels = {}
+
+    for (let mirror of this._allMirrors) {
+      for (panelNumber in this.panelPositions[mirror]) {
+        if (panelNumber in panels) {
+
+        }
+        else {
+
+        }
+
+      }
+    }
+
+    var panel = {
+      deviceName: "Panel " + panelNumber,
+      panelNumber: panelNumber,
+      id: "panel" + panelNumber
+    }
+  }
+
+  _rotatePoint (point, theta) {
     var x = point.x
     var y = point.y
 
@@ -212,7 +259,7 @@ class MirrorWidget extends WidgetCard {
     return { x: rotX, y: rotY }
   }
 
-  computeScales () {
+  computeXYScales () {
     var min = d3.min(this.panels, function (d) { return d3.min(d.vertices, function (e) { return e.x }) })
     var max = d3.max(this.panels, function (d) { return d3.max(d.vertices, function (e) { return e.x }) })
 
@@ -225,36 +272,58 @@ class MirrorWidget extends WidgetCard {
       .range([this.height * 0.1, this.height * 0.9])
   }
 
-  moveTooltip (d, i, group) {
-    this.tooltipDiv.transition()
-      .duration(200)
-      .style('opacity', 0.9)
-    this.tooltipDiv
-      .style('top', d3.event.clientY + 'px')
-      .style('left', (d3.event.clientX - 400) + 'px')
+  computeTempScales () {
+    this.internalTempScale = d3.scaleSequential(d3.interpolateRdBu)
+    .domain([10, 30]);
+
+    this.externalTempScale = d3.scaleSequential(d3.interpolateRdBu)
+    .domain([10, 30])
   }
 
-  hideTooltip (d, i) {
-    this.tooltipDiv.transition()
-      .duration(500)
-      .style('opacity', 0)
+  updateTooltip (d, i, group) {
+    this.tooltipTarget = d.deviceName
+    this.tooltipContent = this.getTooltipContent(d)
+    //this.tooltipDiv.querySelector('#tooltip-device-name').innerHTML = d.deviceName
+    //this.tooltipDiv.querySelector('#tooltip-device-info').innerHTML = this.getTooltipData(d)
+    this.tooltipDiv.for = d.id
   }
 
-  highlight (d, i, group) {
+  getTooltipContent (d) {
+    if (this.viewMode === "internal_temp") {
+      return "Internal Temperature: " + d.data.InternalTemperature
+    }
+    else if (this.viewMode === "external_temp") {
+      return "External Temperature: " + d.data.ExternalTemperature
+    }
+  }
+
+  addHighlight (d, i, group) {
     d3.select(group[i])
-      .style('stroke-width', 0.3)
+      .style('stroke-width', 0.6)
       .style('stroke', 'blue')
-      .style('fill', 'LightSkyBlue')
+  }
+
+  removeHighlight (d, i, group) {
+    d3.select(group[i])
+      .style('stroke-width', 0.1)
+      .style('stroke', 'black')
+  }
+
+  render () {
+    this.renderPanels()
   }
 
   renderPanels () {
-    // Render panel objects
+    // Completely re-render all panels
     var svg = this.shadowRoot.querySelector('svg')
+    // Clear previous contents
+    svg.selectAll("*").remove();
 
     d3.select(svg).selectAll('polygon')
-      .data(this.panels)
+      .data(this.panels[this.mirror])
       .enter()
       .append('polygon')
+      .attr('id', d => {return d.id})
       .attr('points', d => {
         return d.vertices.map(
           e => {
@@ -266,30 +335,21 @@ class MirrorWidget extends WidgetCard {
       .style('stroke', 'black')
       .style('stroke-width', 0.1)
       .attr('pointer-events', 'all')
-      .on('click', (d, i) => {
-        console.log(d)
+      .on('click', (d, i, group) => {
+        console.log(group[i])
         // this.infoWindowView.changeSelection(d.id)
       })
       .on('mouseover', (function (d, i, group) {
-        console.log(group[i])
-        this.highlight(d, i, group)
-        this.moveTooltip(d, i, group)
+        this.addHighlight(d, i, group)
+        this.updateTooltip(d, i, group)
       }).bind(this))
       .on('mouseout', (function (d, i, group) {
-        d3.select(group[i])
-          .style('stroke-width', 0.1)
-          .style('stroke', 'black')
-          .style('fill', 'transparent')
-
-          this.tooltipDiv.transition()
-            .duration(500)
-            .style('opacity', 0)
+        this.removeHighlight(d, i, group)
       }).bind(this))
   }
 
   firstUpdated(changedProps) {
-    this.tooltipDiv = d3.select(this.shadowRoot.querySelector('.tooltip'))
-    console.log(this.tooltipDiv)
+    this.tooltipDiv = this.shadowRoot.querySelector('#tooltip')
     // Render all objects in canvas
     this.renderPanels()
   }
@@ -303,39 +363,56 @@ class MirrorWidget extends WidgetCard {
       width: ${this.width};
       border-style: solid;
     }
-    .tooltip {
-       position: absolute;
-       text-align: center;
-       width: 60px;
-       height: 28px;
-       padding: 2px;
-       font: 12px sans-serif;
-       background: lightsteelblue;
-       border: 0px;
-       border-radius: 8px;
-       pointer-events: none;
-   }
     </style>
     <div class="mirror-header paper-font-headline">${this.name}</div>
+    <paper-radio-group selected="${this.viewMode}" @selected-changed= "${this._changeViewMode}">
+      ${this._allViewModes.map(i => html`<paper-radio-button name="${i}">${i}</paper-radio-button>`)}
+    </paper-radio-group>
     <div class="mirror-body">
     <svg class="mirror-svg" preserveAspectRatio="xMidYMidmeet" viewBox="0 0 ${this.width} ${this.height}"></svg>
     </div>
-    <div class="tooltip" style="opacity: 0;">Panel 2223</div>
+    <paper-tooltip hidden id="tooltip">
+      <div class="paper-font-body1" id="tooltip-device-name">${this.tooltipTarget}</div>
+      <div class="paper-font-body1" id="tooltip-device-info">${this.tooltipContent}</div>
+    </paper-tooltip>
     `;
+  }
+
+  _changeViewMode (e) {
+    this.viewMode = e.detail.value
+    // re-render
+  }
+
+  _changeMirror (e) {
+    this.mirror = e.detail.value
+    this.computeXYScales()
+    this.renderPanels()
   }
 
   get actionsTemplate() {
     return html`
-    <paper-button raised toggles>Primary</paper-button>
-    <paper-button raised toggles>Secondary</paper-button>
+    <paper-radio-group selected="${this.mirror}" @selected-changed= "${this._changeMirror}">
+      ${this._allMirrors.map(i => html`<paper-radio-button name="${i}">${i}</paper-radio-button>`)}
+    </paper-radio-group>
     `
   }
 
   static get properties() {
     return {
       name: { type: String },
-      mirror: { type: String }
+      mirror: { type: String },
+      viewMode: { type: String }
     }
+  }
+
+  selectDevice(e){
+    this.selectedDevice = e.device
+    var event = new CustomEvent('change-selected-device', { deviceid: this.selectedDevice.id });
+    this.dispatchEvent(event);
+}
+
+  _refreshButtonClicked(e) {
+    this.socketioClient.request_all_data()
   }
 }
 

@@ -362,11 +362,13 @@ export const WidgetStyles = html`
     height: 100%;
     position: fixed;
     top: 0;
-    left: 0; 
+    left: 0;
   }
-  .card-actions > iron-icon {
+  .card-actions > paper-icon-button {
     float: right;
     padding: 10px 0;
+    width: 50px;
+    height: 50px;
   }
   .card-actions > paper-button {
     float: left;
