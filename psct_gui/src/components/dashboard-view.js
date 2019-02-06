@@ -15,7 +15,7 @@ import '../components/device-tree-widget.js';
 class DashboardView extends PageViewElement {
   constructor () {
     super()
-    this.selectedDeviceID = "ns=2;s=Panel_0"
+    this.selectedDeviceID = null
   }
 
   render () {
@@ -33,7 +33,7 @@ class DashboardView extends PageViewElement {
         <div class="dashboard-body">
           <div class="flex-container">
             <div style="flex-grow: 6; height: 200%">
-              <device-tree-widget @changed-selected-device="${this.updateSelectedDevice}"></device-tree-widget>
+              <device-tree-widget @changed-selected-device="${this._onChangedSelectedDevice}"></device-tree-widget>
             </div>
             <div style="flex-grow: 1; height: 200%">
               <info-window-widget deviceID="${this.selectedDeviceID}"></info-window-widget>
@@ -54,8 +54,8 @@ class DashboardView extends PageViewElement {
     `
   }
 
-  updateSelectedDevice(e){
-    this.selectedDeviceID = e.deviceid
+  _onChangedSelectedDevice(e){
+    this.selectedDeviceID = e.detail
   }
 
   static get properties () {
