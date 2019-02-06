@@ -192,6 +192,8 @@ class OPCUADeviceModel(BaseDeviceModel):
         self._errors = {node_name: self._error_nodes[node_name].get_value()
                         for node_name in self._error_nodes}
 
+        self._position_info = {}
+
     @classmethod
     def create(cls, obj_node, opcua_client, *args, **kwargs):
         """Model class for OPC UA device models.
@@ -258,6 +260,9 @@ class OPCUADeviceModel(BaseDeviceModel):
     @property
     def position_info(self):
         return self._position_info
+
+    def get_data(self, name):
+        return self._data_nodes[name].get_value()
 
     def set_data(self, name, value):
         variant = opcua.ua.DataValue(opcua.ua.Variant(value))
