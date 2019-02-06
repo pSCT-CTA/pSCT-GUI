@@ -25,8 +25,8 @@ export class WidgetCard extends LitElement {
       </div>
       <div class="card-actions">
         ${this.actionsTemplate}
-        <paper-icon-button icon=${this.fullscreen? "fullscreen-exit": "fullscreen"} title="fullscreen" @click="${this._fullscreenButtonClicked}"></paper-icon-button>
-        <paper-icon-button icon="refresh" slot="item-icon" @click="${this._refreshButtonClicked}" title="refresh"></paper-icon-button>
+        <paper-icon-button icon=${this.fullscreen? "fullscreen-exit": "fullscreen"} title="fullscreen" @click="${this._onFullscreenButtonClicked}"></paper-icon-button>
+        <paper-icon-button icon="refresh" slot="item-icon" @click="${this._onRefreshButtonClicked}" title="refresh"></paper-icon-button>
       </div>
     </paper-card>
     `;
@@ -40,17 +40,18 @@ export class WidgetCard extends LitElement {
     return html``
   }
 
-  _refreshButtonClicked(e) {
+  _onRefreshButtonClicked(e) {
   }
 
-  _fullscreenButtonClicked(e) {
+  _onFullscreenButtonClicked(e) {
+    /**
     if (!this.fullscreen) {
       this.fullscreen = true
     }
     else {
       this.fullscreen = false
     }
-
+    */
   }
 
   static get properties() {

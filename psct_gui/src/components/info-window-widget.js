@@ -210,8 +210,8 @@ class InfoWindowWidget extends WidgetCard {
     // Call stop method (on seperate thread)
   }
 
-  _refreshButtonClicked(e) {
-    // Call read method
+  _onRefreshButtonClicked(e) {
+    this.socketioClient.request_all_data("ids", [this.deviceID])
     this.requestUpdate()
   }
 
