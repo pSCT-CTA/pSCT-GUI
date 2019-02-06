@@ -77,7 +77,7 @@ class BaseDeviceModel(ABC):
     @property
     def all_data(self):
         return {
-            'device_id': self.id,
+            'id': self.id,
             'name': self.name,
             'type': self.type,
             'position_info': self.position_info,

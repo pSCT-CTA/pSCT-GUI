@@ -100,7 +100,7 @@ class BackendServer(object):
                 all_data[id] = device_model.all_data
         elif devices_by == "all":
             for id in self.device_models:
-                all_data[id] = self.device_models[id]
+                all_data[id] = self.device_models[id].all_data
 
         logger.info('All data sent for component {}.'.format(
             component_name))
@@ -144,8 +144,8 @@ class BackendServer(object):
         for node in device_tree_root_node.get_children():
             self.__traverse_node(node, None)
 
-        for device_model in self.device_models.values():
-            device_model.start_subscriptions()
+        #for device_model in self.device_models.values():
+        #    device_model.start_subscriptions()
 
     # Function to recursively traverse node tree
     def __traverse_node(self, node, parent_model):
