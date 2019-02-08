@@ -55,6 +55,8 @@
     "@vaadin/vaadin-dialog": "^2.2.1",
     "@vaadin/vaadin-form-layout": "^2.1.1",
     "@vaadin/vaadin-grid": "^5.2.7",
+    "@vaadin/vaadin-item": "^2.1.0",
+    "@vaadin/vaadin-list-box": "^1.1.0",
     "@vaadin/vaadin-material-styles": "^1.2.0",
     "@vaadin/vaadin-select": "^2.0.2",
     "@vaadin/vaadin-text-field": "^2.1.7",
