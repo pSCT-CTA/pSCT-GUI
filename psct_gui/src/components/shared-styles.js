@@ -357,10 +357,9 @@ export const WidgetStyles = html`
     transition: width 0.5s, height 0.5s;
   }
   paper-card.fullscreen {
-    z-index: 9999;
-    width: 100%;
-    height: 100%;
+    z-index: -1;
     position: fixed;
+    width: 100%;
     top: 0;
     left: 0;
   }
@@ -389,5 +388,8 @@ export const ViewStyles = html`
 }
 .view-title {
   margin: 10px;
+}
+.full-height {
+  height: 100%;
 }
 </style>`;
