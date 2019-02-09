@@ -55,6 +55,7 @@ class BackendServer(object):
         @self.sio.on('disconnect')
         def on_disconnect(sid):
             logger.info("Client disconnected: {}".format(sid))
+            self.sio_clients.remove(sid)
 
         @self.sio.on('request_all_data')
         def on_request_all_data(sid, request_data):
@@ -105,12 +106,8 @@ class BackendServer(object):
             for id in self.device_models:
                 all_data[id] = self.device_models[id].all_data
 
-        sio.emit('all_data', all_data, room=sid)
-
         logger.info('All data sent for component {}.'.format(
             component_name))
-
-
 
         return all_data
 
@@ -151,7 +148,7 @@ class BackendServer(object):
         for node in device_tree_root_node.get_children():
             self.__traverse_node(node, None)
 
-        #for device_model in self.device_models.values():
+        # for device_model in self.device_models.values():
         #    device_model.start_subscriptions()
 
     # Function to recursively traverse node tree

@@ -4,17 +4,17 @@ import { PageViewElement } from './page-view-element.js'
 // These are the shared styles needed by this element.
 import { PaperFontStyles, ViewStyles } from './shared-styles.js'
 
-import '../components/widget-card.js';
+// Custom components
+import '../components/device-tree-widget.js';
 import '../components/info-window-widget.js';
 import '../components/error-table-widget.js';
 import '../components/history-log-widget.js';
-import '../components/device-tree-widget.js';
 
-// Polymer elements
 
 class DashboardView extends PageViewElement {
   constructor () {
     super()
+    // At startup, no device selected
     this.selectedDeviceID = null
   }
 
