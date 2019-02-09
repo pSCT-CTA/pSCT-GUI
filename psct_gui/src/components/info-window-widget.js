@@ -25,8 +25,7 @@ class InfoWindowWidgetClient extends BaseSocketioDeviceClient {
         var i = this.component.deviceData.findIndex(x => x.name === data.name)
         if (i > -1) {
           // Flash color change
-          this.component.deviceData[i].value = data.value.toFixed(6)
-          console.log(this.component.deviceData[i])
+          this.component.deviceData[i].value = (Number.isInteger(data.value)) ? data.value : data.value.toFixed(6)
         }
       }
       else if (data.data_type === "error") {
@@ -67,6 +66,22 @@ class InfoWindowWidget extends WidgetCard {
 
     this.socketioClient = new InfoWindowWidgetClient("http://localhost:5000", this)
     this.socketioClient.connect()
+  }
+
+  static get properties() {
+    var properties = super.properties
+    Object.assign(properties, {
+      deviceID: { type: String },
+      deviceName: { type: String },
+      deviceType: { type: String },
+      deviceData: { type: Array },
+      deviceErrors: { type: Array },
+      deviceStatus: { type: Number },
+      deviceMethods: { type: Array },
+      _dialogOpen: { type: Boolean }
+    })
+
+    return properties
   }
 
   get contentTemplate() {
@@ -139,7 +154,7 @@ class InfoWindowWidget extends WidgetCard {
         </vaadin-grid>
       </div>
 
-      <vaadin-dialog id="call-method-dialog" ?opened="${this._dialogOpen}" @opened-changed="${this._updateDialog}" no-close-on-outside-click>
+      <vaadin-dialog id="call-method-dialog" ?opened="${this._dialogOpen}" @opened-changed="${this._onDialogOpenChanged}" no-close-on-outside-click>
         <template id="method-dialog-content">
           <div class="paper-font-headline">Call a method.</div>
           <vaadin-select id='select-method' label='Required' placeholder='Choose a Method' required>
@@ -154,7 +169,7 @@ class InfoWindowWidget extends WidgetCard {
           <div class='button-area'>
             <paper-button raised id='execute-button' disabled>Execute</paper-button>
             <paper-button raised id='stop-button'>Stop</paper-button>
-            <paper-button style='float: right;' id='close-button' @click="${this._closeDialog}">Close</paper-button>
+            <paper-button style='float: right;' id='close-button' @click="${this.closeDialog}">Close</paper-button>
           </div>
         </template>
       </vaadin-dialog>`:
@@ -164,9 +179,11 @@ class InfoWindowWidget extends WidgetCard {
 
   get actionsTemplate() {
     return html`
-    <paper-button raised id="call-method-button" @click="${this._openDialog}">Call Method</paper-button>
+    <paper-button raised id="call-method-button" @click="${this.openDialog}">Call Method</paper-button>
     `
   }
+
+  // Polymer lifecycle methods
 
   updated() {
   // Disable stop button if the device doesn't have a stop method
@@ -174,17 +191,27 @@ class InfoWindowWidget extends WidgetCard {
     this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#stop-button').disabled = true
   }
   // Activate interactivity on close button
-  this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#close-button').onclick = this._closeDialog
+  this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#close-button').onclick = this.closeDialog
 }
 
-  _openDialog() {
+// Event handlers
+
+  openDialog() {
     this._dialogOpen = true
   }
-  _closeDialog() {
+  closeDialog() {
     this._dialogOpen = false
   }
-  _updateDialog(e) {
+
+  // Needed to handle case where the dialog is closed by clocking away, rather than the close button
+  _onDialogOpenChanged(e) {
     this._dialogOpen = e.detail.value
+  }
+
+  _onRefreshButtonClicked(e) {
+    if (this.deviceID !== null && this.deviceID !== "null") {
+      this.socketioClient.request_all_data("ids", [this.deviceID])
+    }
   }
 
   methodSelected() {
@@ -194,7 +221,6 @@ class InfoWindowWidget extends WidgetCard {
     // Add submit button, if necessary
 
     // If there are no arguments, un-disable execute button
-
   }
 
   submitArguments() {
@@ -210,11 +236,6 @@ class InfoWindowWidget extends WidgetCard {
     // Call stop method (on seperate thread)
   }
 
-  _onRefreshButtonClicked(e) {
-    this.socketioClient.request_all_data("ids", [this.deviceID])
-    this.requestUpdate()
-  }
-
   setAllData(data)  {
     var deviceAllData = data[this.deviceID]
 
@@ -224,9 +245,10 @@ class InfoWindowWidget extends WidgetCard {
     var dataFields = []
     for (var d in deviceAllData.data) {
         if (deviceAllData.data.hasOwnProperty(d)) {
+
            dataFields.push({
              name: d,
-             value: deviceAllData.data[d].toFixed(6)
+             value: (Number.isInteger(deviceAllData.data[d])) ? deviceAllData.data[d] : deviceAllData.data[d].toFixed(6)
            })
         }
     }
@@ -252,31 +274,16 @@ class InfoWindowWidget extends WidgetCard {
     this.requestUpdate()
   }
 
+  // Getter and setter for deviceID property
+
   get deviceID() { return this._deviceID; }
 
   set deviceID(newID) {
     let oldDeviceID = this.deviceID;
     this._deviceID = newID;
-    if (newID) {
+    if (newID !== null && newID !== "null") {
       this.socketioClient.request_all_data("ids", [newID])
-      this.requestUpdate()
     }
-  }
-
-  static get properties() {
-    var properties = super.properties
-    Object.assign(properties, {
-      deviceID: { type: String },
-      deviceName: { type: String },
-      deviceType: { type: String },
-      deviceData: { type: Array },
-      deviceErrors: { type: Array },
-      deviceStatus: { type: Number },
-      deviceMethods: { type: Array },
-      _dialogOpen: { type: Boolean }
-    })
-
-    return properties
   }
 }
 
