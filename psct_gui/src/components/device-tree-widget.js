@@ -18,23 +18,6 @@ class DeviceTreeWidgetClient extends BaseSocketioDeviceClient {
   }
 
   on_data_change(data) {
-    /**
-    var i = this.component.allDevices.findIndex(x => x.deviceID === data.device_id)
-    if (i > -1) {
-      this.component.allDevices[i].
-
-    }
-    {
-      hasChildren:true,
-      isFolder: true,
-      name:"Mirrors",
-      status:"Nominal",
-      statusNum:3,
-      deviceID:"1",
-      parentDeviceIDs: ["0"]
-    },
-    this.component.requestUpdate()
-    */
   }
 }
 
@@ -58,10 +41,13 @@ class DeviceTreeWidget extends WidgetCard {
   // Component properties and templates
 
   static get properties() {
-    return {
-      name: { type: String },
-      mode: { type: String }
-    }
+    var properties = super.properties
+    Object.assign(properties, {
+      mode: { type: String },
+      allItems: { type: Array }
+    })
+
+    return properties
   }
 
   get contentTemplate() {
@@ -106,9 +92,6 @@ class DeviceTreeWidget extends WidgetCard {
 
       </vaadin-grid>
     </div>
-    <script>
-
-    </script>
     `;
   }
 
@@ -168,16 +151,11 @@ class DeviceTreeWidget extends WidgetCard {
   // Generic Lit Element lifecycle methods
 
   updated(changedProperties) {
-    const grid = this.shadowRoot.querySelector('vaadin-grid')
-    grid.dataProvider = this.dataProvider.bind(this)
-
-    const badgeColumn = this.shadowRoot.querySelector('#badgeCol');
-    badgeColumn.renderer = this._badgeColumnRenderer.bind(this)
   }
 
   // Function to retreive and update all data
-
   setAllData(data)  {
+    console.log("setAllData has been called")
     this.allItems = []
     this._allItemsbyID = {}
     this._devices = []
@@ -185,6 +163,7 @@ class DeviceTreeWidget extends WidgetCard {
 
     for (var id in data) {
       if (data.hasOwnProperty(id)) {
+        console.log(id)
         var device = data[id]
         // Create a tree object for each device
         var deviceTreeObject = {
@@ -240,7 +219,11 @@ class DeviceTreeWidget extends WidgetCard {
       }
     }
     this.setMode(this.mode)
-    this.requestUpdate()
+    const grid = this.shadowRoot.querySelector('vaadin-grid')
+    grid.dataProvider = this.dataProvider.bind(this)
+
+    const badgeColumn = this.shadowRoot.querySelector('#badgeCol');
+    badgeColumn.renderer = this._badgeColumnRenderer.bind(this)
   }
 
   setMode(mode) {
@@ -278,11 +261,12 @@ class DeviceTreeWidget extends WidgetCard {
 _onChangeMode (e) {
   this.setMode(e.detail.value)
   this.requestUpdate()
+  console.log(this.allItems)
 }
 
 _onRefreshButtonClicked(e) {
   this.socketioClient.request_all_data("all")
-  this.requestUpdate()
+  console.log(this.allItems)
 }
 
 }
