@@ -230,11 +230,15 @@ class OPCUADeviceModel(BaseDeviceModel):
     @property
     def data(self):
         """dict: Dictionary of data node display names (str) and values."""
+        self._data = {node_name: self._data_nodes[node_name].get_value()
+                      for node_name in self._data_nodes}
         return self._data
 
     @property
     def errors(self):
         """dict: Dictionary of error node display names (str) and values."""
+        self._errors = {node_name: self._error_nodes[node_name].get_value()
+                        for node_name in self._error_nodes}
         return self._errors
 
     @property
@@ -331,7 +335,6 @@ class OPCUADeviceModel(BaseDeviceModel):
                 self._busy = True
                 return_values = self._obj_node.call_method(
                     self._method_names_to_ids[method_name], *args)
-                logger.info(pprint.pformat(return_values))
                 if self._socketio_server:
                     self._socketio_server.emit('method_return', {
                         'device_id': self.id,
@@ -396,6 +399,13 @@ class OPCUADeviceModel(BaseDeviceModel):
             self._socketio_server.emit('method_stopped', {
                 'device_id': self.id})
         self._busy = False
+
+    def read(self):
+        self._data = {node_name: self._data_nodes[node_name].get_value()
+                      for node_name in self._data_nodes}
+        self._errors = {node_name: self._error_nodes[node_name].get_value()
+                        for node_name in self._error_nodes}
+
 
 
 class TelescopeModel(OPCUADeviceModel):
@@ -519,6 +529,10 @@ class PanelModel(OPCUADeviceModel):
 
     def read(self):
         self.call_method('Read')
+        self._data = {node_name: self._data_nodes[node_name].get_value()
+                      for node_name in self._data_nodes}
+        self._errors = {node_name: self._error_nodes[node_name].get_value()
+                        for node_name in self._error_nodes}
 
     def stop(self):
         self.call_stop()

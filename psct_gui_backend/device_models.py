@@ -111,3 +111,7 @@ class BaseDeviceModel(ABC):
     @abstractmethod
     def call_stop(self):
         pass
+
+    @abstractmethod
+    def read(self):
+        pass

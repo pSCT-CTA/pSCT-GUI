@@ -93,17 +93,24 @@ class BackendServer(object):
         devices_by = request_data['devices_by']
         if devices_by == "types":
             for type in request_data['types']:
-                all_data[type] = self.device_models_by_type[type]
+                if type not in all_data:
+                    all_data[type] = {}
+                for id in self.device_models_by_type[type]:
+                    self.device_models_by_type[type][id].read()
+                    all_data[type][id] = self.device_models_by_type[type][id].all_data
         elif devices_by == "ids":
             for id in request_data['ids']:
-                device_model = self.device_models[id]
-                all_data[id] = device_model.all_data
+                all_data[id] = self.device_models[id].all_data
         elif devices_by == "all":
             for id in self.device_models:
                 all_data[id] = self.device_models[id].all_data
 
+        sio.emit('all_data', all_data, room=sid)
+
         logger.info('All data sent for component {}.'.format(
             component_name))
+
+
 
         return all_data
 
