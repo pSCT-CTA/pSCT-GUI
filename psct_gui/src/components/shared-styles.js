@@ -42,7 +42,7 @@ app-drawer {
   display: none !important;
 }
 </style>
-`;
+`
 
 export const IronFlexLayoutStyles = html`
 <style>
@@ -220,7 +220,7 @@ export const IronFlexLayoutStyles = html`
     align-content: space-around;
   }
 </style>
-`;
+`
 
 export const PaperFontStyles = html`
 <style>
@@ -348,10 +348,16 @@ styles. All other styles should exist as single lines."
   font-weight: 500;
   line-height: 20px;
 }
-</style>`;
+</style>`
 
 export const WidgetStyles = html`
 <style>
+  [hidden] {
+    display: none;
+  }
+  .title {
+    margin: 5px;
+  }
   paper-card {
     width: 100%;
     transition: width 0.5s, height 0.5s;
@@ -373,7 +379,7 @@ export const WidgetStyles = html`
     float: left;
     padding: 10px 0;
   }
-</style>`;
+</style>`
 
 export const ViewStyles = html`
 <style>
@@ -392,4 +398,4 @@ export const ViewStyles = html`
 .full-height {
   height: 100%;
 }
-</style>`;
+</style>`

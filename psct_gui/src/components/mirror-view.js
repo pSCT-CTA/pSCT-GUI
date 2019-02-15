@@ -4,8 +4,8 @@ import { PageViewElement } from './page-view-element.js'
 // These are the shared styles needed by this element.
 import { PaperFontStyles, ViewStyles } from './shared-styles.js'
 
-import '../components/info-window-widget.js';
-import '../components/mirror-widget.js';
+import '../components/info-window-widget.js'
+import '../components/mirror-widget.js'
 
 class MirrorView extends PageViewElement {
   constructor () {
@@ -47,7 +47,7 @@ class MirrorView extends PageViewElement {
     `
   }
 
-  _onChangedSelectedDevice(e){
+  _onChangedSelectedDevice (e) {
     this.selectedDeviceID = e.detail
   }
 

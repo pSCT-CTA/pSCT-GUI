@@ -1,74 +1,78 @@
-import { LitElement, html } from '@polymer/lit-element';
+import { LitElement, html } from '@polymer/lit-element'
 
 import { PaperFontStyles } from './shared-styles.js'
 import { WidgetCard } from './widget-card.js'
 import { BaseSocketioDeviceClient } from '../socketio-device-client.js'
 
-import '@polymer/paper-progress/paper-progress.js';
-import '@polymer/paper-button/paper-button.js';
+import '@polymer/paper-progress/paper-progress.js'
+import '@polymer/paper-button/paper-button.js'
 
-import '@vaadin/vaadin-grid/vaadin-grid.js';
-import '@vaadin/vaadin-grid/vaadin-grid-sorter.js';
-import '@vaadin/vaadin-grid/vaadin-grid-filter-column.js';
-import '@vaadin/vaadin-checkbox/vaadin-checkbox.js';
-import '@vaadin/vaadin-dialog/vaadin-dialog.js';
-import '@vaadin/vaadin-select/vaadin-select.js';
+import '@vaadin/vaadin-grid/vaadin-grid.js'
+import '@vaadin/vaadin-grid/vaadin-grid-sorter.js'
+import '@vaadin/vaadin-grid/vaadin-grid-filter-column.js'
+import '@vaadin/vaadin-checkbox/vaadin-checkbox.js'
+import '@vaadin/vaadin-dialog/vaadin-dialog.js'
+import '@vaadin/vaadin-select/vaadin-select.js'
 
 class InfoWindowWidgetClient extends BaseSocketioDeviceClient {
-  constructor (address, component) {
-    super(address, component)
-  }
+  _onNewData (data) {
+    var deviceAllData = data[this.component.deviceID]
 
-  on_data_change(data) {
-    if (data.device_id === this.component.deviceID) {
-      if (data.data_type === "data") {
-        var i = this.component.deviceData.findIndex(x => x.name === data.name)
-        if (i > -1) {
-          // Flash color change
-          this.component.deviceData[i].value = (Number.isInteger(data.value)) ? data.value : data.value.toFixed(6)
-        }
-      }
-      else if (data.data_type === "error") {
-        if (data.value == true) {
-          this.component.deviceErrors.push({
-            errorCode: data.name,
-            severity: "Fatal",
-            severityIndex: 3,
-            timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
-            description: "Test Description"
-          })
-        }
-        else {
-          var i = this.component.deviceData.findIndex(x => x.errorCode == data.name)
-          if (i > -1) {
-            this.component.deviceErrors.splice(i, 1)
-          }
-        }
+    var dataFields = []
+    for (var d in deviceAllData.data) {
+      if (deviceAllData.data.hasOwnProperty(d)) {
+        dataFields.push({
+          name: d,
+          value: (Number.isInteger(deviceAllData.data[d])) ? deviceAllData.data[d] : deviceAllData.data[d].toFixed(6)
+        })
       }
     }
-    this.component.requestUpdate()
+
+    var errors = []
+    for (var e in deviceAllData.errors) {
+      if (deviceAllData.errors.hasOwnProperty(e)) {
+        errors.push({
+          errorCode: e,
+          severity: 'Fatal',
+          severityIndex: 3,
+          timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
+          description: 'Test Description'
+        })
+      }
+    }
+
+    this.component.deviceName = deviceAllData.name
+    this.component.deviceType = deviceAllData.type
+    this.component.deviceStatus = 3
+    this.component.deviceData = dataFields
+    this.component.deviceErrors = errors
+    this.component.deviceMethods = deviceAllData.methods
+
+    this.component.loading = false
   }
 }
 
 class InfoWindowWidget extends WidgetCard {
-  constructor() {
+  constructor () {
     super()
     this.name = 'Info'
+    this.showName = false
     this._dialogOpen = false
 
-
-    this.deviceName = ""
-    this.deviceType = ""
+    this.deviceName = ''
+    this.deviceType = ''
     this.deviceData = []
     this.deviceErrors = []
     this.deviceStatus = 3
     this.deviceMethods = []
 
-    this.socketioClient = new InfoWindowWidgetClient("http://localhost:5000", this)
+    this.socketioClient = new InfoWindowWidgetClient('http://localhost:5000', this)
     this.socketioClient.connect()
+
+    this.loading = false
   }
 
-  static get properties() {
+  static get properties () {
     var properties = super.properties
     Object.assign(properties, {
       deviceID: { type: String },
@@ -84,10 +88,10 @@ class InfoWindowWidget extends WidgetCard {
     return properties
   }
 
-  get contentTemplate() {
+  get contentTemplate () {
     return html`
-    ${this.deviceID !== null?
-      html`
+    ${this.deviceID !== null
+    ? html`
       ${PaperFontStyles}
       <style>
       paper-progress.red {
@@ -110,21 +114,24 @@ class InfoWindowWidget extends WidgetCard {
         background-color: #white;
         width: 125px;
       }
+      .info-header {
+        margin: 5px;
+      }
       </style>
       <div class="info-header paper-font-headline">${this.deviceName}</div>
       <div class="status-display">
-        ${this.deviceStatus===3?
-            html`<paper-progress value="100" class="green"></paper-progress> <div class="paper-font-subhead">Nominal</div>`:
-            html``
-          }
-        ${this.deviceStatus===2?
-            html`<paper-progress value="66" class="yellow""></paper-progress> <div class="paper-font-subhead">Operable</div>`:
-            html``
-          }
-        ${this.deviceStatus===1?
-            html`<paper-progress value="33" class="red"></paper-progress> <div class="paper-font-subhead">Fatal</div>`:
-            html``
-          }
+        ${this.deviceStatus === 3
+    ? html`<paper-progress value="100" class="green"></paper-progress> <div class="paper-font-subhead">Nominal</div>`
+    : html``
+}
+        ${this.deviceStatus === 2
+    ? html`<paper-progress value="66" class="yellow""></paper-progress> <div class="paper-font-subhead">Operable</div>`
+    : html``
+}
+        ${this.deviceStatus === 1
+    ? html`<paper-progress value="33" class="red"></paper-progress> <div class="paper-font-subhead">Fatal</div>`
+    : html``
+}
       </div>
       <div class="paper-font-subhead">${this.deviceType}</div>
       <br>
@@ -172,50 +179,50 @@ class InfoWindowWidget extends WidgetCard {
             <paper-button style='float: right;' id='close-button' @click="${this.closeDialog}">Close</paper-button>
           </div>
         </template>
-      </vaadin-dialog>`:
-      html``
-    }`
+      </vaadin-dialog>`
+    : html``
+}`
   }
 
-  get actionsTemplate() {
+  get actionsTemplate () {
     return html`
     <paper-button raised id="call-method-button" @click="${this.openDialog}">Call Method</paper-button>
     `
   }
 
   // Polymer lifecycle methods
-
-  updated() {
-  // Disable stop button if the device doesn't have a stop method
-  if (!this.deviceMethods.find(device => device.name === "stop")) {
-    this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#stop-button').disabled = true
+  updated () {
+    // Disable stop button if the device doesn't have a stop method
+    if (!this.deviceMethods.find(device => device.name === 'stop')) {
+      this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#stop-button').disabled = true
+    }
+    // Activate interactivity on close button
+    this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#close-button').onclick = this.closeDialog
   }
-  // Activate interactivity on close button
-  this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#close-button').onclick = this.closeDialog
-}
 
-// Event handlers
+  // Event handlers
 
-  openDialog() {
+  openDialog () {
     this._dialogOpen = true
   }
-  closeDialog() {
+  closeDialog () {
     this._dialogOpen = false
   }
 
   // Needed to handle case where the dialog is closed by clocking away, rather than the close button
-  _onDialogOpenChanged(e) {
+  _onDialogOpenChanged (e) {
     this._dialogOpen = e.detail.value
   }
 
-  _onRefreshButtonClicked(e) {
-    if (this.deviceID !== null && this.deviceID !== "null") {
-      this.socketioClient.request_all_data("ids", [this.deviceID])
+  refresh () {
+    if (this.deviceID !== null && this.deviceID !== 'null') {
+      this.loading = true
+      this.socketioClient.request_all_data('ids', [this.deviceID])
     }
   }
 
-  methodSelected() {
-    var selectedMethod = this.shadowRoot.querySelector('vaadin-select').value;
+  methodSelected () {
+    var selectedMethod = this.shadowRoot.querySelector('vaadin-select').value
 
     // Replace input-options-box with fields to input coordinates (if necessary)
     // Add submit button, if necessary
@@ -223,20 +230,20 @@ class InfoWindowWidget extends WidgetCard {
     // If there are no arguments, un-disable execute button
   }
 
-  submitArguments() {
+  submitArguments () {
     // Write all arguments
     // Un-disable execute button
   }
 
-  executeMethod() {
+  executeMethod () {
     // Send method call
   }
 
-  stopMethod() {
+  stopMethod () {
     // Call stop method (on seperate thread)
   }
 
-  setAllData(data)  {
+  setAllData (data) {
     var deviceAllData = data[this.deviceID]
 
     this.deviceName = deviceAllData.name
@@ -244,27 +251,26 @@ class InfoWindowWidget extends WidgetCard {
 
     var dataFields = []
     for (var d in deviceAllData.data) {
-        if (deviceAllData.data.hasOwnProperty(d)) {
-
-           dataFields.push({
-             name: d,
-             value: (Number.isInteger(deviceAllData.data[d])) ? deviceAllData.data[d] : deviceAllData.data[d].toFixed(6)
-           })
-        }
+      if (deviceAllData.data.hasOwnProperty(d)) {
+        dataFields.push({
+          name: d,
+          value: (Number.isInteger(deviceAllData.data[d])) ? deviceAllData.data[d] : deviceAllData.data[d].toFixed(6)
+        })
+      }
     }
     this.deviceData = dataFields
 
     var errors = []
     for (var e in deviceAllData.errors) {
-        if (deviceAllData.errors.hasOwnProperty(e)) {
-           errors.push({
-             errorCode: e,
-             severity: "Fatal",
-             severityIndex: 3,
-             timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
-             description: "Test Description"
-           })
-        }
+      if (deviceAllData.errors.hasOwnProperty(e)) {
+        errors.push({
+          errorCode: e,
+          severity: 'Fatal',
+          severityIndex: 3,
+          timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
+          description: 'Test Description'
+        })
+      }
     }
     this.deviceErrors = errors
 
@@ -276,13 +282,12 @@ class InfoWindowWidget extends WidgetCard {
 
   // Getter and setter for deviceID property
 
-  get deviceID() { return this._deviceID; }
+  get deviceID () { return this._deviceID }
 
-  set deviceID(newID) {
-    let oldDeviceID = this.deviceID;
-    this._deviceID = newID;
-    if (newID !== null && newID !== "null") {
-      this.socketioClient.request_all_data("ids", [newID])
+  set deviceID (newID) {
+    this._deviceID = newID
+    if (newID !== null && newID !== 'null') {
+      this.socketioClient.request_all_data('ids', [newID])
     }
   }
 }
