@@ -14,10 +14,6 @@ class BaseDeviceModel(ABC):
         self.children = {}
         self.parents = []
 
-        # Flag indicating whether a method is being executed
-        # (only 1 allowed concurrently)
-        self._busy = False
-
     @property
     @abstractmethod
     def data(self):
@@ -110,8 +106,4 @@ class BaseDeviceModel(ABC):
 
     @abstractmethod
     def call_stop(self):
-        pass
-
-    @abstractmethod
-    def read(self):
         pass
