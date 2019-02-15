@@ -57,9 +57,9 @@ class BackendServer(object):
             logger.info("Client disconnected: {}".format(sid))
             self.sio_clients.remove(sid)
 
-        @self.sio.on('request_all_data')
-        def on_request_all_data(sid, request_data):
-            return self._on_request_all_data(sid, request_data)
+        @self.sio.on('request_data')
+        def on_request_data(sid, request):
+            return self._on_request_data(sid, request)
 
         @self.sio.on('call_method')
         def on_call_method(sid, data):
@@ -87,29 +87,29 @@ class BackendServer(object):
         logger.info("Disconnecting OPC UA client...")
         self.opcua_client.disconnect()
 
-    def _on_request_all_data(self, sid, request_data):
-        logger.info("Received all data request: {}".format(request_data))
-        all_data = {}
-        component_name = request_data['component_name']
-        devices_by = request_data['devices_by']
+    def _on_request_data(self, sid, request):
+        logger.info("Received data request: {}".format(request))
+        data = {}
+        component_name = request['component_name']
+        devices_by = request['devices_by']
         if devices_by == "types":
-            for type in request_data['types']:
-                if type not in all_data:
-                    all_data[type] = {}
+            for type in request['types']:
+                if type not in data:
+                    data[type] = {}
                 for id in self.device_models_by_type[type]:
                     self.device_models_by_type[type][id].read()
-                    all_data[type][id] = self.device_models_by_type[type][id].all_data
+                    data[type][id] = self.device_models_by_type[type][id].all_data
         elif devices_by == "ids":
-            for id in request_data['ids']:
-                all_data[id] = self.device_models[id].all_data
+            for id in request['ids']:
+                data[id] = self.device_models[id].all_data
         elif devices_by == "all":
             for id in self.device_models:
-                all_data[id] = self.device_models[id].all_data
+                data[id] = self.device_models[id].all_data
 
-        logger.info('All data sent for component {}.'.format(
+        self.sio.emit('new_data', data, room=sid)
+
+        logger.info('Requested data sent for component {}.'.format(
             component_name))
-
-        return all_data
 
     def _on_call_method(self, sid, data):
         device_id = data['device_id']
@@ -191,10 +191,16 @@ class BackendServer(object):
 
 
 class OldBackendServer(BackendServer):
-    def initialize_device_models(self, device_node_paths):
+    def initialize_device_models(self, device_node_paths=None):
         logger.info("Creating device models...")
-        for path in device_node_paths:
-            node = self.opcua_client.get_objects_node().get_child(path)
+        objects_node = self.opcua_client.get_objects_node()
+        
+        if device_node_paths:
+            nodes = [objects_node.get_child(path) for path in device_node_paths]
+        else:
+            nodes = objects_node.get_children()
+
+        for node in nodes:
             node_type = self.opcua_client.get_node(node.get_type_definition())
             model = OPCUADeviceModel.create(
                 node, self.opcua_client)
@@ -203,11 +209,11 @@ class OldBackendServer(BackendServer):
             logger.info(
                 "Created device model with type {}, node id {}.".format(
                     node_type, node.nodeid))
-
+        
         logger.info("{} device models created.".format(len(self.device_models)))
 
-        for device_model in self.device_models.values():
-            device_model.start_subscriptions()
+        # for device_model in self.device_models.values():
+        #    device_model.start_subscriptions()
         logger.info("Subscriptions started.")
 
 
@@ -231,11 +237,11 @@ if __name__ == "__main__":
     opcua_client = opcua.Client(args.opcua_server_address, timeout=60)
     sio = socketio.Server()
 
-    serv = BackendServer(opcua_client, sio)
-    serv.initialize_device_models("2:DeviceTree")
+    #serv = BackendServer(opcua_client, sio)
+    #serv.initialize_device_models("2:DeviceTree")
 
-    #serv = OldBackendServer(opcua_client, sio)
-    #serv.initialize_device_models(["2:Panel_2111"])
+    serv = OldBackendServer(opcua_client, sio)
+    serv.initialize_device_models()
 
     app = socketio.Middleware(sio)
     eventlet.wsgi.server(eventlet.listen(('', 5000)), app)
