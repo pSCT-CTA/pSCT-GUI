@@ -127,11 +127,19 @@ class OPCUADeviceModel(BaseDeviceModel):
                  obj_node,
                  opcua_client,
                  socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a OPCUADeviceModel instance."""
         super().__init__(socketio_server=socketio_server)
         self._opcua_client = opcua_client
-        self._sub_periods = sub_periods
+
+        if sub_periods is None:
+            self._sub_periods = {}
+        else:
+            self._sub_periods = sub_periods
+
+        # Flag indicating whether a method is being executed
+        # (only 1 allowed concurrently)
+        self._busy = False
 
         if socketio_server:
             self._socketio_server = socketio_server
@@ -148,10 +156,6 @@ class OPCUADeviceModel(BaseDeviceModel):
         self._name = self._obj_node.get_display_name().to_string()
         self._device_type_name = self.DEVICE_TYPE_NAME
         self._node_type_name = self._type_node.get_display_name()
-
-        # Flag indicating whether a method is being executed
-        # (only 1 allowed concurrently)
-        self._busy = False
 
         # All monitored data nodes (properties and variables)
         _data_nodes = (
@@ -184,13 +188,6 @@ class OPCUADeviceModel(BaseDeviceModel):
                                    for node_name in self._data_nodes}
         self._error_node_to_name = {self._error_nodes[node_name]: node_name
                                     for node_name in self._error_nodes}
-
-        # Initialize data dictionary and error dictionary.
-        # Maps data property/error names to values
-        self._data = {node_name: self._data_nodes[node_name].get_value()
-                      for node_name in self._data_nodes}
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
-                        for node_name in self._error_nodes}
 
         self._position_info = {}
 
@@ -230,16 +227,14 @@ class OPCUADeviceModel(BaseDeviceModel):
     @property
     def data(self):
         """dict: Dictionary of data node display names (str) and values."""
-        self._data = {node_name: self._data_nodes[node_name].get_value()
+        return {node_name: self._data_nodes[node_name].get_value()
                       for node_name in self._data_nodes}
-        return self._data
 
     @property
     def errors(self):
         """dict: Dictionary of error node display names (str) and values."""
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
+        return {node_name: self._error_nodes[node_name].get_value()
                         for node_name in self._error_nodes}
-        return self._errors
 
     @property
     def methods(self):
@@ -268,6 +263,9 @@ class OPCUADeviceModel(BaseDeviceModel):
     def get_data(self, name):
         return self._data_nodes[name].get_value()
 
+    def get_error(self, name):
+        return self._error_nodes[name].get_value()
+
     def set_data(self, name, value):
         variant = opcua.ua.DataValue(opcua.ua.Variant(value))
         self._data_nodes[name].set_value(variant)
@@ -279,14 +277,6 @@ class OPCUADeviceModel(BaseDeviceModel):
         logger.info("Error node [{}] set to: {}".format(name, value))
 
     def start_subscriptions(self):
-        """Add a OPCUADeviceModel as a child of this device.
-
-        Parameters
-        ----------
-        child : psct_gui.backend.device_models.OPCUADeviceModel
-            OPCUADeviceModel to add as a child.
-
-        """
         for n, node_dict in [('data', self._data_nodes),
                              ('errors', self._error_nodes)]:
             if n == 'data':
@@ -399,14 +389,6 @@ class OPCUADeviceModel(BaseDeviceModel):
             self._socketio_server.emit('method_stopped', {
                 'device_id': self.id})
         self._busy = False
-
-    def read(self):
-        self._data = {node_name: self._data_nodes[node_name].get_value()
-                      for node_name in self._data_nodes}
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
-                        for node_name in self._error_nodes}
-
-
 
 class TelescopeModel(OPCUADeviceModel):
     """Model class for a telescope device."""
@@ -528,14 +510,10 @@ class PanelModel(OPCUADeviceModel):
         self.call_method_background('MoveToCoords')
 
     def read(self):
-        self.call_method('Read')
-        self._data = {node_name: self._data_nodes[node_name].get_value()
-                      for node_name in self._data_nodes}
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
-                        for node_name in self._error_nodes}
+        return self.call_method('Read')
 
     def stop(self):
-        self.call_stop()
+        return self.call_stop()
 
 
 class EdgeModel(OPCUADeviceModel):
