@@ -90,8 +90,7 @@ class InfoWindowWidget extends WidgetCard {
 
   get contentTemplate () {
     return html`
-    ${this.deviceID !== null
-    ? html`
+
       ${PaperFontStyles}
       <style>
       paper-progress.red {
@@ -102,6 +101,9 @@ class InfoWindowWidget extends WidgetCard {
       }
       paper-progress.yellow {
         --paper-progress-active-color: #ffeb3b;
+      }
+      paper-progress.gray {
+        --paper-progress-active-color: #b2b2b2;
       }
       .paper-font-title {
         margin: 3px;
@@ -118,6 +120,19 @@ class InfoWindowWidget extends WidgetCard {
         margin: 5px;
       }
       </style>
+
+      ${this.deviceID === null || this.deviceID === "null"
+    ? html`
+    <div class="info-header paper-font-headline">Device Not Found</div>
+      <div class="status-display">
+        <paper-progress value="100" class="gray"></paper-progress> <div class="paper-font-subhead">N/A</div>
+      </div>
+      <div class="paper-font-subhead">None</div>
+      <br>
+      <div class="info-body">
+        <div class="paper-font-body2">No data. Device is not found in server.</div>
+      </div>`
+     : html`
       <div class="info-header paper-font-headline">${this.deviceName}</div>
       <div class="status-display">
         ${this.deviceStatus === 3
@@ -159,9 +174,9 @@ class InfoWindowWidget extends WidgetCard {
             <div class="paper-font-body1"><b>Description:</b> [[item.description]]</div>
           </template>
         </vaadin-grid>
-      </div>
-
-      <vaadin-dialog id="call-method-dialog" ?opened="${this._dialogOpen}" @opened-changed="${this._onDialogOpenChanged}" no-close-on-outside-click>
+      </div>`
+    }
+    <vaadin-dialog id="call-method-dialog" ?opened="${this._dialogOpen}" @opened-changed="${this._onDialogOpenChanged}" no-close-on-outside-click>
         <template id="method-dialog-content">
           <div class="paper-font-headline">Call a method.</div>
           <vaadin-select id='select-method' label='Required' placeholder='Choose a Method' required>
@@ -179,9 +194,9 @@ class InfoWindowWidget extends WidgetCard {
             <paper-button style='float: right;' id='close-button' @click="${this.closeDialog}">Close</paper-button>
           </div>
         </template>
-      </vaadin-dialog>`
-    : html``
-}`
+    </vaadin-dialog>
+    <paper-toast id="deviceNotFoundToast" text="Device not found."></paper-toast>
+    `
   }
 
   get actionsTemplate () {
@@ -203,7 +218,12 @@ class InfoWindowWidget extends WidgetCard {
   // Event handlers
 
   openDialog () {
-    this._dialogOpen = true
+    if (this.deviceID !== null && this.deviceID !== 'null') {
+        this._dialogOpen = true
+    }
+    else {
+        this.shadowRoot.getElementById('deviceNotFoundToast').open()
+    }
   }
   closeDialog () {
     this._dialogOpen = false
@@ -217,7 +237,10 @@ class InfoWindowWidget extends WidgetCard {
   refresh () {
     if (this.deviceID !== null && this.deviceID !== 'null') {
       this.loading = true
-      this.socketioClient.request_all_data('ids', [this.deviceID])
+      this.socketioClient.requestData('ids', [this.deviceID])
+    }
+    else {
+        this.shadowRoot.getElementById('deviceNotFoundToast').open()
     }
   }
 
@@ -287,7 +310,7 @@ class InfoWindowWidget extends WidgetCard {
   set deviceID (newID) {
     this._deviceID = newID
     if (newID !== null && newID !== 'null') {
-      this.socketioClient.request_all_data('ids', [newID])
+      this.socketioClient.requestData('ids', [newID])
     }
   }
 }

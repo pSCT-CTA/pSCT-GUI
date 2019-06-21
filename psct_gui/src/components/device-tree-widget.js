@@ -14,7 +14,6 @@ import '@vaadin/vaadin-grid/vaadin-grid-tree-toggle.js'
 
 class DeviceTreeWidgetClient extends BaseSocketioDeviceClient {
   _onNewData (data) {
-    console.log(data)
     var _allItemsbyID = {}
     var _devices = []
     var _deviceTypeFolders = []
@@ -78,6 +77,7 @@ class DeviceTreeWidgetClient extends BaseSocketioDeviceClient {
     this.component._deviceTypeFolders = _deviceTypeFolders
 
     this.component.setMode(this.component.mode)
+    console.log(this.component.getChildDevices)
     this.component.grid.dataProvider = this.component.dataProvider
 
     const badgeColumn = this.component.shadowRoot.querySelector('#badgeCol')
@@ -148,10 +148,7 @@ class DeviceTreeWidget extends WidgetCard {
           </vaadin-grid-tree-toggle>
         </template>
       </vaadin-grid-column>
-
-      <vaadin-grid-column width="8em" flex-grow="0" id="badgeCol" header="Status">
-      </vaadin-grid-column>
-
+      <vaadin-grid-column width="8em" flex-grow="0" id="badgeCol" header="Status"></vaadin-grid-column>
     </vaadin-grid>
     `
   }
@@ -164,7 +161,7 @@ class DeviceTreeWidget extends WidgetCard {
     `
   }
 
-  _getChildDevices (parentDeviceID, callback) {
+  getChildDevices (parentDeviceID, callback) {
     callback(this.allItems.filter(function (device) {
       if (parentDeviceID) {
         if (!device.hasOwnProperty('parentDeviceIDs')) {
@@ -183,19 +180,20 @@ class DeviceTreeWidget extends WidgetCard {
     // If the data request concerns a tree sub-level, `params` has an additional
     // `parentItem` property that refers to the sub-level's parent item
     const parentDeviceID = params.parentItem ? params.parentItem.deviceID : null
-    this._getChildDevices(parentDeviceID, function (selectedDeviceList) {
+
+    this.getChildDevices(parentDeviceID, function (selectedDeviceList) {
       const startIndex = params.page * params.pageSize
       const pageItems = selectedDeviceList.slice(startIndex, startIndex + params.pageSize)
       const treeLevelSize = selectedDeviceList.length
       callback(pageItems, treeLevelSize)
     })
-  };
+  }
 
   _badgeColumnRenderer (root, column, rowData) {
     var contents = ''
     if (rowData.item.status === 3) {
       contents = '<p class="badge yellow paper-font-body1">Operable</p>'
-    } else if (rowData.item.status === 3) {
+    } else if (rowData.item.status === 2) {
       contents = '<p class="badge green paper-font-body1">Nominal</p>'
     } else if (rowData.item.status === 1) {
       contents = '<p class="badge red paper-font-body1">Fatal</p>'

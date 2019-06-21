@@ -52,9 +52,19 @@ class BaseDeviceModel(ABC):
 
     @property
     @abstractmethod
+    def position(self):
+        """int: Position of the object (usually relative to parent)."""
+        pass
+
+    @property
     def position_info(self):
-        """dict: Dictionary of additional information describing the device's
-        physical position."""
+        """dict: Dictionary of extra position info relevant to the specific object type."""
+        return {}
+
+    @property
+    @abstractmethod
+    def serial(self):
+        """str: Serial number of the device object."""
         pass
 
     @property
@@ -76,7 +86,9 @@ class BaseDeviceModel(ABC):
             'id': self.id,
             'name': self.name,
             'type': self.type,
-            'position_info': self.position_info,
+            'position': self.position,
+            'extra_position_info': self.position_info,
+            'serial': self.serial,
             'data': self.data,
             'errors': self.errors,
             'methods': self.methods,

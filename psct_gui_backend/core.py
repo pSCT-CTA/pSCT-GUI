@@ -2,10 +2,17 @@
 import logging
 import argparse
 import sys
+import select
 
 import socketio
-import eventlet
-eventlet.monkey_patch()
+#import eventlet
+#eventlet.monkey_patch()
+from flask import Flask
+#from sanic import Sanic
+
+#from gevent import pywsgi
+#from geventwebsocket.handler import WebSocketHandler
+
 import opcua
 
 from psct_gui_backend.OPCUA_device_models import (OPCUADeviceModel,
@@ -97,7 +104,7 @@ class BackendServer(object):
                 if type not in data:
                     data[type] = {}
                 for id in self.device_models_by_type[type]:
-                    self.device_models_by_type[type][id].read()
+                    #self.device_models_by_type[type][id].read()
                     data[type][id] = self.device_models_by_type[type][id].all_data
         elif devices_by == "ids":
             for id in request['ids']:
@@ -105,6 +112,8 @@ class BackendServer(object):
         elif devices_by == "all":
             for id in self.device_models:
                 data[id] = self.device_models[id].all_data
+
+        print(data)
 
         self.sio.emit('new_data', data, room=sid)
 
@@ -224,6 +233,8 @@ if __name__ == "__main__":
     parser.add_argument('opcua_server_address',
                         help="IP address/port for the OPC UA aggregating "
                         "server")
+    parser.add_argument('--legacy',
+                        help="Use backend server for legacy/old version of OPC UA alignment server")
     parser.add_argument('--debug',
                         help="",
                         action="store_true")
@@ -234,14 +245,26 @@ if __name__ == "__main__":
         logger.setLevel(logging.DEBUG)
 
     logger.info("Starting OPC UA client for address {}".format(args.opcua_server_address))
-    opcua_client = opcua.Client(args.opcua_server_address, timeout=60)
-    sio = socketio.Server()
+    opcua_client = opcua.Client(args.opcua_server_address, timeout=300)
+    sio = socketio.Server(async_mode="threading", ping_timeout=120)
+    #sio = socketio.AsyncServer(async_mode='sanic')
 
-    #serv = BackendServer(opcua_client, sio)
-    #serv.initialize_device_models("2:DeviceTree")
+    serv = BackendServer(opcua_client, sio)
+    serv.initialize_device_models("2:DeviceTree")
 
-    serv = OldBackendServer(opcua_client, sio)
-    serv.initialize_device_models()
+    app = Flask(__name__)
+    app.wsgi_app = socketio.Middleware(sio, app.wsgi_app)
+    #app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
+    app.run(threaded=True)
 
-    app = socketio.Middleware(sio)
-    eventlet.wsgi.server(eventlet.listen(('', 5000)), app)
+    #app = Sanic()
+    #sio.attach(app)
+    #app.run(host="0.0.0.0", port=5000)
+
+    #app = socketio.WSGIApp(sio)
+    #pywsgi.WSGIServer(('', 5000), app,
+    #                  handler_class=WebSocketHandler).serve_forever()
+
+    
+    #app = socketio.WSGIApp(sio)
+    #eventlet.wsgi.server(eventlet.listen(('', 5000)), app)

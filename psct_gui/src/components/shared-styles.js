@@ -369,14 +369,18 @@ export const WidgetStyles = html`
     top: 0;
     left: 0;
   }
-  .card-actions > paper-icon-button {
+  .card-actions > .custom-actions {
+    float: left;
+  }
+  .card-actions > .shared-actions {
     float: right;
+  }
+  .shared-actions > paper-icon-button {
     padding: 10px 0;
     width: 50px;
     height: 50px;
   }
-  .card-actions > paper-button {
-    float: left;
+  .custom-actions > paper-button {
     padding: 10px 0;
   }
 </style>`

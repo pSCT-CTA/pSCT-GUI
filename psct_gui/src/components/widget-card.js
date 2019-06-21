@@ -19,8 +19,8 @@ export class WidgetCard extends LitElement {
     this.fullscreen = false
     this.loading = true
 
-    this.refreshRate = 0
-    this._allRefreshRates = [0, 5, 10, 30, 60]
+    this.refreshRate = ''
+    this._allRefreshRates = ['None', 1, 5, 10, 30, 60]
     this._recurringRefresh = null
   }
 
@@ -36,16 +36,22 @@ export class WidgetCard extends LitElement {
         ${this.contentTemplate}
       </div>
       <div class="card-actions">
-        ${this.actionsTemplate}
-        <vaadin-select value="${this.refreshRate}" @value-changed="${this._changeRefreshRate}">
-          <template>
-            <vaadin-list-box>
-              ${this._allRefreshRates.map(i => html`<vaadin-item value="${i}">${i}</vaadin-item>`)}
-            </vaadin-list-box>
-          </template>
-        </vaadin-select>
-        <paper-icon-button icon=${this.fullscreen ? 'fullscreen-exit' : 'fullscreen'} title="fullscreen" @click="${this._onFullscreenButtonClicked}"></paper-icon-button>
-        <paper-icon-button icon="refresh" slot="item-icon" @click="${this._onRefreshButtonClicked}" title="refresh"></paper-icon-button>
+        <div class="custom-actions">
+          ${this.actionsTemplate}
+        </div>
+        <div class="shared-actions">
+          <vaadin-select value="${this.refreshRate}" @value-changed="${this._changeRefreshRate}">
+            <template>
+              <vaadin-list-box>
+                <vaadin-item value='' disabled>Refresh Rate</vaadin-item>
+                <hr>
+                ${this._allRefreshRates.map(i => html`<vaadin-item value="${i}">${i}</vaadin-item>`)}
+              </vaadin-list-box>
+            </template>
+          </vaadin-select>
+          <paper-icon-button icon=${this.fullscreen ? 'fullscreen-exit' : 'fullscreen'} title="fullscreen" @click="${this._onFullscreenButtonClicked}"></paper-icon-button>
+          <paper-icon-button icon="refresh" slot="item-icon" @click="${this._onRefreshButtonClicked}" title="refresh"></paper-icon-button>
+        </div>
       </div>
     </paper-card>
     `
@@ -64,8 +70,8 @@ export class WidgetCard extends LitElement {
     if (this._recurringRefresh !== null) {
       clearInterval(this._recurringRefresh)
     }
-    if (this.refreshRate !== 0) {
-      this._recurringRefresh = setInterval(this.refresh, this.refreshRate * 1000)
+    if (this.refreshRate !== 'None' && this.refreshRate !== '') {
+      this._recurringRefresh = setInterval(this.refresh.bind(this), this.refreshRate * 1000)
     }
   }
 
