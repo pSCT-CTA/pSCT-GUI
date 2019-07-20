@@ -1,4 +1,4 @@
-import { LitElement, html } from '@polymer/lit-element'
+import { html } from '@polymer/lit-element'
 
 import { PaperFontStyles } from './shared-styles.js'
 import { WidgetCard } from './widget-card.js'
@@ -14,62 +14,40 @@ import '@vaadin/vaadin-checkbox/vaadin-checkbox.js'
 import '@vaadin/vaadin-dialog/vaadin-dialog.js'
 import '@vaadin/vaadin-select/vaadin-select.js'
 
-class InfoWindowWidgetClient extends BaseSocketioDeviceClient {
-  _onNewData (data) {
-    var deviceAllData = data[this.component.deviceID]
-
-    var dataFields = []
-    for (var d in deviceAllData.data) {
-      if (deviceAllData.data.hasOwnProperty(d)) {
-        dataFields.push({
-          name: d,
-          value: (Number.isInteger(deviceAllData.data[d])) ? deviceAllData.data[d] : deviceAllData.data[d].toFixed(6)
-        })
-      }
-    }
-
-    var errors = []
-    for (var e in deviceAllData.errors) {
-      if (deviceAllData.errors.hasOwnProperty(e)) {
-        errors.push({
-          errorCode: e,
-          severity: 'Fatal',
-          severityIndex: 3,
-          timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
-          description: 'Test Description'
-        })
-      }
-    }
-
-    this.component.deviceName = deviceAllData.name
-    this.component.deviceType = deviceAllData.type
-    this.component.deviceStatus = 3
-    this.component.deviceData = dataFields
-    this.component.deviceErrors = errors
-    this.component.deviceMethods = deviceAllData.methods
-
-    this.component.loading = false
-  }
-}
-
 class InfoWindowWidget extends WidgetCard {
   constructor () {
     super()
     this.name = 'Info'
     this.showName = false
+
     this._dialogOpen = false
 
+    this._deviceID = null
     this.deviceName = ''
     this.deviceType = ''
     this.deviceData = []
     this.deviceErrors = []
-    this.deviceStatus = 3
+    this.deviceState = 0
+    this.deviceErrorState = 0
     this.deviceMethods = []
 
-    this.socketioClient = new InfoWindowWidgetClient('http://localhost:5000', this)
-    this.socketioClient.connect()
+    this.dataRequest = {
+        component_name: this.name,
+        fields: {
+            all: {
+                data: "all",
+                errors: "all",
+                methods: "all"
+            }
+        },
+        device_ids: []
+    }
 
-    this.loading = false
+    this.deviceToRequest = {id: null, type: ""}
+
+    this.socketioClient = new BaseSocketioDeviceClient('http://localhost:5000', this)
+    this.socketioClient.connect()
+    this.socketioClient.requestData(this.dataRequest)
   }
 
   static get properties () {
@@ -80,7 +58,8 @@ class InfoWindowWidget extends WidgetCard {
       deviceType: { type: String },
       deviceData: { type: Array },
       deviceErrors: { type: Array },
-      deviceStatus: { type: Number },
+      deviceState: { type: Number },
+      deviceErrorState: { type: Number },
       deviceMethods: { type: Array },
       _dialogOpen: { type: Boolean }
     })
@@ -108,7 +87,7 @@ class InfoWindowWidget extends WidgetCard {
       .paper-font-title {
         margin: 3px;
       }
-      .status-display > paper-progress, .status-display > div {
+      .error-status-display > paper-progress, .error-status-display > div {
         display: inline-block;
       }
       #call-method-button {
@@ -119,40 +98,80 @@ class InfoWindowWidget extends WidgetCard {
       .info-header {
         margin: 5px;
       }
+      .badge {
+        width: 50px;
+        border-radius: 3px;
+        color: black;
+        text-align: center;
+        display:inline-block;
+      }
+      .gray {
+        background-color: gray;
+      }
+      .red {
+        background-color: red;
+      }
+      .yellow {
+        background-color: yellow;
+      }
+      .green {
+        background-color: lime;
+      }
+      vaadin-grid-cell-content {
+         word-wrap: break-word;
+         white-space: normal;
+      }
       </style>
 
       ${this.deviceID === null || this.deviceID === "null"
     ? html`
-    <div class="info-header paper-font-headline">Device Not Found</div>
+    <div class="info-header paper-font-display1">Device Not Found</div>
       <div class="status-display">
+        <div class="paper-font-headline" style="display:inline-block;">${this.deviceType}</div>
+        <p class="badge gray paper-font-body1">N/A</p>
+      </div>
+      <div class="error-status-display">
         <paper-progress value="100" class="gray"></paper-progress> <div class="paper-font-subhead">N/A</div>
       </div>
-      <div class="paper-font-subhead">None</div>
       <br>
       <div class="info-body">
         <div class="paper-font-body2">No data. Device is not found in server.</div>
       </div>`
      : html`
-      <div class="info-header paper-font-headline">${this.deviceName}</div>
+      <div class="info-header paper-font-display1">${this.deviceName}</div>
       <div class="status-display">
-        ${this.deviceStatus === 3
+      <div class="paper-font-headline" style="display:inline-block;">${this.deviceType}</div>
+        ${this.deviceState === 2
+    ? html`<p class="badge yellow paper-font-body1">Busy</p>`
+    : html``
+}
+        ${this.deviceState === 1
+    ? html`<p class="badge green paper-font-body1">On</p>`
+    : html``
+}
+        ${this.deviceState === 0
+    ? html`<p class="badge gray paper-font-body1">Off</p>`
+    : html``
+}
+      </div>
+      <div class="error-status-display">
+        ${this.deviceErrorState === 0
     ? html`<paper-progress value="100" class="green"></paper-progress> <div class="paper-font-subhead">Nominal</div>`
     : html``
 }
-        ${this.deviceStatus === 2
+        ${this.deviceErrorState === 1
     ? html`<paper-progress value="66" class="yellow""></paper-progress> <div class="paper-font-subhead">Operable</div>`
     : html``
 }
-        ${this.deviceStatus === 1
+        ${this.deviceErrorState === 2
     ? html`<paper-progress value="33" class="red"></paper-progress> <div class="paper-font-subhead">Fatal</div>`
     : html``
 }
       </div>
-      <div class="paper-font-subhead">${this.deviceType}</div>
       <br>
       <div class="info-body">
         <div class="paper-font-title">Properties</div>
-        <vaadin-grid items="${JSON.stringify(this.deviceData)}" height-by-rows>
+        <vaadin-grid items="${JSON.stringify(this.deviceData)}" height-by-rows size=6>
           <vaadin-grid-filter-column path="name" header="Field Name"></vaadin-grid-filter-column>
           <vaadin-grid-column path="value" header="Value"></vaadin-grid-column>
         </vaadin-grid>
@@ -236,8 +255,8 @@ class InfoWindowWidget extends WidgetCard {
 
   refresh () {
     if (this.deviceID !== null && this.deviceID !== 'null') {
+      this.socketioClient.requestData(this.dataRequest)
       this.loading = true
-      this.socketioClient.requestData('ids', [this.deviceID])
     }
     else {
         this.shadowRoot.getElementById('deviceNotFoundToast').open()
@@ -265,54 +284,111 @@ class InfoWindowWidget extends WidgetCard {
   stopMethod () {
     // Call stop method (on seperate thread)
   }
-
-  setAllData (data) {
-    var deviceAllData = data[this.deviceID]
-
-    this.deviceName = deviceAllData.name
-    this.deviceType = deviceAllData.type
-
-    var dataFields = []
-    for (var d in deviceAllData.data) {
-      if (deviceAllData.data.hasOwnProperty(d)) {
-        dataFields.push({
-          name: d,
-          value: (Number.isInteger(deviceAllData.data[d])) ? deviceAllData.data[d] : deviceAllData.data[d].toFixed(6)
-        })
-      }
-    }
-    this.deviceData = dataFields
-
-    var errors = []
-    for (var e in deviceAllData.errors) {
-      if (deviceAllData.errors.hasOwnProperty(e)) {
-        errors.push({
-          errorCode: e,
-          severity: 'Fatal',
-          severityIndex: 3,
-          timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
-          description: 'Test Description'
-        })
-      }
-    }
-    this.deviceErrors = errors
-
-    this.deviceStatus = 3
-    this.deviceMethods = deviceAllData.methods
-
-    this.requestUpdate()
-  }
-
   // Getter and setter for deviceID property
 
   get deviceID () { return this._deviceID }
 
-  set deviceID (newID) {
-    this._deviceID = newID
-    if (newID !== null && newID !== 'null') {
-      this.socketioClient.requestData('ids', [newID])
+  set deviceToRequest (device) {
+    if (device.id !== null && device.id !== 'null') {
+      this._deviceID = device.id
+      this.dataRequest.device_ids = { [device.type]: [device.id] }
+      this.refresh()
+    }
+    else {
+      this.dataRequest.device_ids = []
     }
   }
+
+  getErrorNumFromName (error_name) {
+      var pattern = /\[[0-9]+\]/ // extract pattern of "[errorNum]" from the error name string
+      var error_num = error_name.match(pattern)[0]
+      error_num = parseInt(error_num.substring(1, error_num.length-1)) // strip leading and trailing "[} and "]" and convert to int
+      return error_num
+  }
+
+  getErrorSeverityFromName (error_name) {
+      var pattern = /\[[a-zA-Z]+\]/ // extract pattern of "[severity]" from the error name string
+      var severity = error_name.match(pattern)[0]
+      severity = severity.substring(1, severity.length-1)
+      var severityCode = null
+      if (severity === "Operable") {
+         severityCode = 1
+      }
+      else if (severity === "Fatal") {
+         severityCode = 2
+      }
+      return [severityCode, severity]
+  }
+
+  getErrorDescFromName (error_name) {
+      var description = error_name.split("]")[2]
+      return description
+  }
+  
+  _onRequestedData (data) {
+    console.log(data)
+    var device = null
+    if (Object.keys(data).length === 0) {
+        this.deviceToRequest = {id: null, type: ""}
+        this.loading = false
+        return
+  }
+
+    for (var deviceType in data) {
+      if (data.hasOwnProperty(deviceType)) {
+        for (var deviceId in data[deviceType]) {
+          if (data[deviceType].hasOwnProperty(deviceId)) {
+            device = data[deviceType][deviceId]
+          }
+        }
+      }
+    }
+
+    var dataFields = []
+    for (var d in device.data) {
+      if (device.data.hasOwnProperty(d)) {
+        var formattedOutput;
+        if (typeof device.data[d] === 'string') {
+            formattedOutput = device.data[d]
+        }
+        else if (Number.isInteger(device.data[d])) {
+            formattedOutput = device.data[d];
+        }
+        else {
+            formattedOutput = device.data[d].toFixed(6);
+        }
+        dataFields.push({
+          name: d,
+          value: formattedOutput
+        })
+      }
+    }
+
+    var errorFields = []
+    for (var e in device.errors) {
+      if (device.errors.hasOwnProperty(e) && device.errors[e]) {
+        errorFields.push({
+          errorCode: this.getErrorNumFromName(e),
+          severity: this.getErrorSeverityFromName(e)[1],
+          severityIndex: this.getErrorSeverityFromName(e)[0],
+          timeString: (new Date()).toISOString(),
+          description: this.getErrorDescFromName(e)
+        })
+      }
+    }
+
+    this.deviceName = device.name.replace(/_/g, " ")
+    this.deviceType = device.type
+    this.deviceState = device.data.State
+    this.deviceErrorState = device.data.ErrorState
+    this.deviceData = dataFields
+    this.deviceErrors = errorFields
+    this.deviceMethods = device.methods
+
+    this.loading = false
+  }
 }
+
+
 
 window.customElements.define('info-window-widget', InfoWindowWidget)

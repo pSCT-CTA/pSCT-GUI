@@ -36,36 +36,14 @@ export class BaseSocketioDeviceClient {
     }.bind(this))
 
     // Device-specific handlers
-    this.socket.on('new_data', this._onNewData.bind(this))
-    this.socket.on('data_change', this._onDataChange.bind(this))
-    this.socket.on('method_return', this._onMethodReturn.bind(this))
-    this.socket.on('method_stopped', this._onMethodStopped.bind(this))
-    this.socket.on('device_busy', this._onDeviceBusy.bind(this))
+    this.socket.on('requested_data', this.component._onRequestedData.bind(this.component))
+    this.socket.on('data_change', this.component._onDataChange)
+    this.socket.on('method_return', this.component._onMethodReturn)
+    this.socket.on('method_stopped', this.component._onMethodStopped)
+    this.socket.on('device_busy', this.component._onDeviceBusy)
   }
 
-  _onNewData (data) {
-  }
-  _onDataChange (data) {
-  }
-  _onMethodReturn (data) {
-  }
-  _onMethodStopped (data) {
-  }
-  _onDeviceBusy (data) {
-  }
-
-  requestData (devicesBy, selection = null) {
-    var request = {
-      component_name: this.component.name,
-      devices_by: devicesBy }
-    if (devicesBy === 'types') {
-      request.types = selection
-    } else if (devicesBy === 'ids') {
-      request.ids = selection
-    } else if (devicesBy === 'all') {
-    } else {
-      throw new Error('Invalid devices_by mode.')
-    }
+  requestData (request) {
     this.socket.emit('request_data', request)
   }
 

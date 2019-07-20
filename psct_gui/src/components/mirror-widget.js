@@ -1,4 +1,4 @@
-import { LitElement, html } from '@polymer/lit-element'
+import { html } from '@polymer/lit-element'
 
 import { PaperFontStyles } from './shared-styles.js'
 import { WidgetCard } from './widget-card.js'
@@ -16,13 +16,6 @@ import '@polymer/paper-tooltip/paper-tooltip.js'
 import '@vaadin/vaadin-select/vaadin-select.js'
 import '@vaadin/vaadin-item/vaadin-item.js'
 import '@vaadin/vaadin-list-box/vaadin-list-box.js'
-
-class MirrorWidgetClient extends BaseSocketioDeviceClient {
-  _onNewData (data) {
-    console.log(data)
-    this.component.updateAllData(data)
-  }
-}
 
 class MirrorWidget extends WidgetCard {
   constructor () {
@@ -180,12 +173,49 @@ class MirrorWidget extends WidgetCard {
     this.xScale = null
     this.yScale = null
 
+    this.dataRequest = {
+        component_name: this.name,
+        fields: {
+            All: {
+                data: ["ErrorState", "State"],
+                errors: [],
+                methods: []
+            },
+            Panel: {
+                data: ["InternalTemperature", "ExternalTemperature"],
+                errors: [],
+                methods: []
+            },
+            MPES: {
+                data: ["xCentroidAvg", "yCentroidAvg", "xCentroidNominal", "yCentroidNominal"],
+                errors: [],
+                methods: []
+            },
+            Actuator: {
+                data: ["CurrentLength"],
+                errors: [],
+                methods: []
+            },
+            Edge: {
+                data: [],
+                errors: [],
+                methods: []
+            }
+        },
+        device_ids: {
+            Panel: "all",
+            MPES: "all",
+            Actuator: "all",
+            Edge: "all"
+        }
+    }
+
     // One-time computation of hardcoded mirror geometry
     this.computeMirrorGeometry()
 
-    this.socketioClient = new MirrorWidgetClient('http://localhost:5000', this)
+    this.socketioClient = new BaseSocketioDeviceClient('http://localhost:5000', this)
     this.socketioClient.connect()
-    this.refresh()
+    this.socketioClient.requestData(this.dataRequest)
   }
 
   static get properties () {
@@ -402,9 +432,11 @@ class MirrorWidget extends WidgetCard {
             delete this.positions[mirror].Panel[panelNumber] // delete any that we successfully found
         }
 
+        console.log(panelData)
         // Search for MPES children and match them by position number
-        for (var mpesId in panelData.children.MPES) {
-            var mpesData = data.MPES[mpesId]
+        for (let i = 0; i < panelData.children.MPES.length; i++) {
+            var mpesData = data.MPES[panelData.children.MPES[i]]
+            console.log(mpesData)
             var mpesPosition = mpesData.position
             if (mpesPosition in this.positions[mirror].MPES[panelNumber]) { // Find the matching mpes position object
                 var mpesObject = {}
@@ -415,8 +447,9 @@ class MirrorWidget extends WidgetCard {
         }
 
         // Search for Actuator children and match them
-        for (var actuatorId in panelData.children.Actuator) {
-            var actuatorData = data.Actuator[actuatorId]
+        for (let i = 0; i < panelData.children.Actuator.length; i++) {
+            var actuatorData = data.Actuator[panelData.children.Actuator[i]]
+            console.log(actuatorData)
             var actuatorPosition = actuatorData.position
             if (actuatorPosition in this.positions[mirror].Actuator[panelNumber]) { // Find the matching mpes position object
                 var actuatorObject = {}
@@ -427,8 +460,9 @@ class MirrorWidget extends WidgetCard {
         }
     }
      // Match edges by name
-     for (var edgeId in data.Edge) {
-        var edgeData = data.Edge[edgeId]
+     for (let i = 0; i < data.Edge.length; i++) {
+        var edgeData = data.Edge[i]
+        console.log(edgeData)
         var edgePosition = edgeData.name.split('_')[1]
         if (edgePosition in this.positions[mirror].Edge) { // Find the matching edge position object
             var edgeObject = {}
@@ -480,7 +514,7 @@ class MirrorWidget extends WidgetCard {
   }
 
   // Setting data
-  updateAllData (data) {
+  _onRequestedData (data) {
     if (!this.initialized) {
         console.log(data)
         this.matchDevices(data)
@@ -823,6 +857,9 @@ class MirrorWidget extends WidgetCard {
           var colorScale = d3.schemeRdYlGn[10].slice().reverse()
           var scale = this.alignmentColorScale
       }
+      else {
+        console.log("Invalid view mode")
+      }
 
       var gradient = colorLegendObject.append('defs')
         .append('linearGradient')
@@ -920,14 +957,13 @@ class MirrorWidget extends WidgetCard {
   }
 
   _onClickDevice (data) {
-    var event = new CustomEvent('changed-selected-device', { detail: data.id })
-    this.dispatchEvent(event)
+      var event = new CustomEvent('changed-selected-device', { detail: {'type': data.deviceType, 'id': data.deviceID }})
+      this.dispatchEvent(event)
   }
 
   refresh () {
-    this.socketioClient.requestData('types', ['Panel', 'Edge', 'MPES', 'Actuator'])
-    //this.socketioClient.requestData('types', ['Panel', 'MPES', 'Actuator'])
-    //this.socketioClient.requestData('types', ['Actuator'])
+    this.socketioClient.requestData(this.dataRequest)
+    this.loading = true
   }
 }
 

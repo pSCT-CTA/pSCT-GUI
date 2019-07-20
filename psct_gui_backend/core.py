@@ -5,9 +5,9 @@ import sys
 import select
 
 import socketio
-#import eventlet
-#eventlet.monkey_patch()
-from flask import Flask
+import eventlet
+eventlet.monkey_patch()
+#from flask import Flask
 #from sanic import Sanic
 
 #from gevent import pywsgi
@@ -98,25 +98,67 @@ class BackendServer(object):
         logger.info("Received data request: {}".format(request))
         data = {}
         component_name = request['component_name']
-        devices_by = request['devices_by']
-        if devices_by == "types":
-            for type in request['types']:
-                if type not in data:
-                    data[type] = {}
-                for id in self.device_models_by_type[type]:
-                    #self.device_models_by_type[type][id].read()
-                    data[type][id] = self.device_models_by_type[type][id].all_data
-        elif devices_by == "ids":
-            for id in request['ids']:
-                data[id] = self.device_models[id].all_data
-        elif devices_by == "all":
-            for id in self.device_models:
-                data[id] = self.device_models[id].all_data
+        fields = request['fields']
+        device_ids = request['device_ids']
 
-        print(data)
+        if device_ids == "all":
+            device_ids = {device_type: "all" for device_type in self.device_models_by_type.keys()}
 
-        self.sio.emit('new_data', data, room=sid)
+        if "all" in fields:
+            fields_for_all = fields["all"]
+        else:
+            fields_for_all = {}
 
+        for device_type in device_ids:
+            if device_type in self.device_models_by_type:
+                data[device_type] = {}
+                if device_ids[device_type] == "all":
+                    device_ids[device_type] = self.device_models_by_type[device_type].keys()
+
+                for device_id in device_ids[device_type]:
+                    if device_id in self.device_models_by_type[device_type]:
+                        model = self.device_models_by_type[device_type][device_id]
+                        data[device_type][device_id] = {
+                            'id': model.id,
+                            'name': model.name,
+                            'type': model.type,
+                            'position': model.position,
+                            'extra_position_info': model.position_info,
+                            'serial': model.serial,
+                            'children': {type: [child.id for child in model.children[type]]
+                                         for type in model.children},
+                            'parents': [parent.id for parent in model.parents]
+                        }
+
+                        fields_to_retrieve = fields_for_all
+                        if device_type in fields:
+                            fields_to_retrieve = {**fields_to_retrieve, **fields[device_type]}
+
+                        for field_type in fields_to_retrieve:
+                            if field_type == "data":
+                                if fields_to_retrieve["data"] == "all":
+                                    data[device_type][device_id]["data"] = model.data
+                                else:
+                                    data[device_type][device_id]["data"] = {}
+                                    for var_name in fields_to_retrieve["data"]:
+                                        data[device_type][device_id]["data"][var_name] = model.get_data(var_name)
+
+                            elif field_type == "errors":
+                                if fields_to_retrieve["errors"] == "all":
+                                    data[device_type][device_id]["errors"] = model.errors
+                                else:
+                                    data[device_type][device_id]["errors"] = {}
+                                    for var_name in fields_to_retrieve["errors"]:
+                                        data[device_type][device_id]["errors"][var_name] = model.get_error(var_name)
+                            elif field_type == "methods":
+                                if fields_to_retrieve["methods"] == "all":
+                                    data[device_type][device_id]["methods"] = model.methods
+                                else:
+                                    data[device_type][device_id]["methods"] = {}
+                                    for var_name in fields_to_retrieve["methods"]:
+                                        data[device_type][device_id]["methods"][var_name] = model.get_method(var_name)
+
+        self.sio.emit('requested_data', data, room=sid)
         logger.info('Requested data sent for component {}.'.format(
             component_name))
 
@@ -172,30 +214,27 @@ class BackendServer(object):
         else:
             # If node already seen, get corresponding model
             if node.nodeid.to_string() in self.device_models:
-                model = self.device_models[node.nodeid.to_string()]
                 recurse = False
             else:
                 logger.info("Creating device model with id: {}".format(
                     node.nodeid.to_string()))
-                model = OPCUADeviceModel.create(
+                self.device_models[node.nodeid.to_string()] = OPCUADeviceModel.create(
                     node, self.opcua_client, socketio_server=self.sio)
-                self.device_models[node.nodeid.to_string()] = model
-                if model.DEVICE_TYPE_NAME not in self.device_models_by_type:
-                    self.device_models_by_type[model.DEVICE_TYPE_NAME] = {}
-                self.device_models_by_type[model.DEVICE_TYPE_NAME][node.nodeid.to_string()] = model
+                if self.device_models[node.nodeid.to_string()].DEVICE_TYPE_NAME not in self.device_models_by_type:
+                    self.device_models_by_type[self.device_models[node.nodeid.to_string()].DEVICE_TYPE_NAME] = {}
+                self.device_models_by_type[self.device_models[node.nodeid.to_string()].DEVICE_TYPE_NAME][node.nodeid.to_string()] = self.device_models[node.nodeid.to_string()]
                 recurse = True
 
             if parent_model:
-                parent_model.add_child(model)
-            new_parent = model
+                parent_model.add_child(self.device_models[node.nodeid.to_string()])
+            new_parent = self.device_models[node.nodeid.to_string()]
 
         # Recurse through children, including references
         # Only if not seen before
         children = node.get_children(nodeclassmask=1)
         if recurse and children:
             for child in children:
-                type_node_id = (child.get_type_definition()).to_string()
-                if type_node_id in VALID_NODE_TYPE_IDS:
+                if child.get_type_definition().to_string() in VALID_NODE_TYPE_IDS:
                     self.__traverse_node(child, new_parent)
 
 
@@ -246,16 +285,19 @@ if __name__ == "__main__":
 
     logger.info("Starting OPC UA client for address {}".format(args.opcua_server_address))
     opcua_client = opcua.Client(args.opcua_server_address, timeout=300)
-    sio = socketio.Server(async_mode="threading", ping_timeout=120)
+    #sio = socketio.Server(async_mode="threading", ping_timeout=120)
+    sio = socketio.Server(async_mode='eventlet', ping_timeout=300, ping_interval=300, allow_upgrades=False)
     #sio = socketio.AsyncServer(async_mode='sanic')
 
     serv = BackendServer(opcua_client, sio)
     serv.initialize_device_models("2:DeviceTree")
 
-    app = Flask(__name__)
-    app.wsgi_app = socketio.Middleware(sio, app.wsgi_app)
+    #app = Flask(__name__)
+    #app.wsgi_app = socketio.Middleware(sio, app.wsgi_app)
     #app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
-    app.run(threaded=True)
+    #app.run(threaded=True)
+
+
 
     #app = Sanic()
     #sio.attach(app)
@@ -266,5 +308,5 @@ if __name__ == "__main__":
     #                  handler_class=WebSocketHandler).serve_forever()
 
     
-    #app = socketio.WSGIApp(sio)
-    #eventlet.wsgi.server(eventlet.listen(('', 5000)), app)
+    app = socketio.WSGIApp(sio)
+    eventlet.wsgi.server(eventlet.listen(('', 5000)), app)

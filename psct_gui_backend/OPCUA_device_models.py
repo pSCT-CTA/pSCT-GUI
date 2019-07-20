@@ -117,7 +117,6 @@ class OPCUADeviceModel(BaseDeviceModel):
     DEVICE_TYPE_NAME = "OPCUADeviceModel"
 
     FOLDER_TYPE_NODE_ID = "i=61"
-    ERROR_NODE_BROWSE_NAME = "0:Errors"
 
     DEFAULT_DATA_SUBSCRIPTION_PUBLISH_INTERVAL = 1000
     DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL = 100
@@ -141,9 +140,6 @@ class OPCUADeviceModel(BaseDeviceModel):
         # (only 1 allowed concurrently)
         self._busy = False
 
-        if socketio_server:
-            self._socketio_server = socketio_server
-
         self._sub_handler = SubHandler(self)
         self._subscriptions = {}
 
@@ -153,6 +149,7 @@ class OPCUADeviceModel(BaseDeviceModel):
             self._obj_node.get_type_definition())
 
         self._id = self._obj_node.nodeid.to_string()
+        self._display_name = self._obj_node.get_display_name().to_string()
         self._name = self._obj_node.get_display_name().to_string().replace('_', ' ')
         self._position = ""
         self._serial = ""
@@ -164,7 +161,7 @@ class OPCUADeviceModel(BaseDeviceModel):
             self._obj_node.get_properties() + self._obj_node.get_variables())
 
         # NOTE: Requires that node display names for all properties
-        # and variables are unique within each device
+        # and variables are unique within each devicege
         self._data_nodes = {}
         for node in _data_nodes:
             if node.get_display_name().to_string() == "Position":
@@ -176,14 +173,11 @@ class OPCUADeviceModel(BaseDeviceModel):
 
         # TEMPORARY: Try-catch to allow instantiation even if errors not
         # implemented
-        try:
-            _error_nodes = self._obj_node.get_child(
-                [OPCUADeviceModel.ERROR_NODE_BROWSE_NAME]).get_variables()
-            self._error_nodes = {node.get_display_name().to_string(): node
-                                 for node in _error_nodes}
-
-        except Exception:
-            self._error_nodes = {}
+        error_folder = self._obj_node.get_child(["2:Errors"])
+        _error_nodes = self._obj_node.get_child(
+            ["2:Errors"]).get_children()
+        self._error_nodes = {node.get_display_name().to_string(): node
+                             for node in _error_nodes}
 
         self._method_names_to_ids = {
             node.get_display_name().to_string(): node.nodeid
@@ -275,6 +269,10 @@ class OPCUADeviceModel(BaseDeviceModel):
 
     def get_error(self, name):
         return self._error_nodes[name].get_value()
+
+    def get_method(self, name):
+        if name in self._method_names_to_ids:
+            return name
 
     def set_data(self, name, value):
         variant = opcua.ua.DataValue(opcua.ua.Variant(value))
