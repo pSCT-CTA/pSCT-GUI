@@ -2,7 +2,6 @@
 from abc import abstractmethod
 import logging
 import threading
-import pprint
 import opcua
 
 from psct_gui_backend.device_models import BaseDeviceModel
@@ -98,43 +97,34 @@ class OPCUADeviceModel(BaseDeviceModel):
 
     Attributes
     ----------
-    DEVICE_TYPE_NAME : str
-        Name of this device type (for printing and dictionary lookup).
-    TYPE_NODE_ID : str
-        OPC UA node id for the type node corresponding to this device type.
-    FOLDER_TYPE_NODE_ID : str
-        Node ID of OPC UA folder type node.
-    ERROR_NODE_BROWSE_NAME : str
-        Browse name of the folder node under each device which contains the
-        error nodes.
-    DEFAULT_DATA_SUBSCRIPTION_PUBLISH_INTERVAL : int
-        Default subscription publish interval for data nodes (in ms).
-    DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL : int
-        Default subscription publish interval for error nodes (in ms).
 
     """
 
     DEVICE_TYPE_NAME = "OPCUADeviceModel"
 
     FOLDER_TYPE_NODE_ID = "i=61"
-    ERROR_NODE_BROWSE_NAME = "0:Errors"
 
     DEFAULT_DATA_SUBSCRIPTION_PUBLISH_INTERVAL = 1000
-    DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL = 1000
+    DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL = 100
 
     @abstractmethod
     def __init__(self,
                  obj_node,
                  opcua_client,
                  socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a OPCUADeviceModel instance."""
         super().__init__(socketio_server=socketio_server)
         self._opcua_client = opcua_client
-        self._sub_periods = sub_periods
 
-        if socketio_server:
-            self._socketio_server = socketio_server
+        if sub_periods is None:
+            self._sub_periods = {}
+        else:
+            self._sub_periods = sub_periods
+
+        # Flag indicating whether a method is being executed
+        # (only 1 allowed concurrently)
+        self._busy = False
 
         self._sub_handler = SubHandler(self)
         self._subscriptions = {}
@@ -145,13 +135,12 @@ class OPCUADeviceModel(BaseDeviceModel):
             self._obj_node.get_type_definition())
 
         self._id = self._obj_node.nodeid.to_string()
-        self._name = self._obj_node.get_display_name().to_string()
+        self._display_name = self._obj_node.get_display_name().to_string()
+        self._name = self._obj_node.get_display_name().to_string().replace('_', ' ')
+        self._position = ""
+        self._serial = ""
         self._device_type_name = self.DEVICE_TYPE_NAME
         self._node_type_name = self._type_node.get_display_name()
-
-        # Flag indicating whether a method is being executed
-        # (only 1 allowed concurrently)
-        self._busy = False
 
         # All monitored data nodes (properties and variables)
         _data_nodes = (
@@ -159,19 +148,21 @@ class OPCUADeviceModel(BaseDeviceModel):
 
         # NOTE: Requires that node display names for all properties
         # and variables are unique within each device
-        self._data_nodes = {node.get_display_name().to_string(): node
-                            for node in _data_nodes}
+        self._data_nodes = {}
+        for node in _data_nodes:
+            if node.get_display_name().to_string() == "Position":
+                self._position = str(node.get_value())
+            elif node.get_display_name().to_string() == "Serial":
+                self._serial = str(node.get_value())
+            else:
+                self._data_nodes[node.get_display_name().to_string()] = node
 
         # TEMPORARY: Try-catch to allow instantiation even if errors not
         # implemented
-        try:
-            _error_nodes = self._obj_node.get_child(
-                [OPCUADeviceModel.ERROR_NODE_BROWSE_NAME]).get_variables()
-            self._error_nodes = {node.get_display_name().to_string(): node
-                                 for node in _error_nodes}
-
-        except Exception:
-            self._error_nodes = {}
+        _error_nodes = self._obj_node.get_child(
+            ["2:Errors"]).get_children()
+        self._error_nodes = {node.get_display_name().to_string(): node
+                             for node in _error_nodes}
 
         self._method_names_to_ids = {
             node.get_display_name().to_string(): node.nodeid
@@ -184,15 +175,6 @@ class OPCUADeviceModel(BaseDeviceModel):
                                    for node_name in self._data_nodes}
         self._error_node_to_name = {self._error_nodes[node_name]: node_name
                                     for node_name in self._error_nodes}
-
-        # Initialize data dictionary and error dictionary.
-        # Maps data property/error names to values
-        self._data = {node_name: self._data_nodes[node_name].get_value()
-                      for node_name in self._data_nodes}
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
-                        for node_name in self._error_nodes}
-
-        self._position_info = {}
 
     @classmethod
     def create(cls, obj_node, opcua_client, *args, **kwargs):
@@ -230,16 +212,14 @@ class OPCUADeviceModel(BaseDeviceModel):
     @property
     def data(self):
         """dict: Dictionary of data node display names (str) and values."""
-        self._data = {node_name: self._data_nodes[node_name].get_value()
-                      for node_name in self._data_nodes}
-        return self._data
+        return {node_name: self._data_nodes[node_name].get_value()
+                    for node_name in self._data_nodes}
 
     @property
     def errors(self):
         """dict: Dictionary of error node display names (str) and values."""
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
+        return {node_name: self._error_nodes[node_name].get_value()
                         for node_name in self._error_nodes}
-        return self._errors
 
     @property
     def methods(self):
@@ -262,11 +242,22 @@ class OPCUADeviceModel(BaseDeviceModel):
         return self._device_type_name
 
     @property
-    def position_info(self):
-        return self._position_info
+    def position(self):
+        return self._position
+
+    @property
+    def serial(self):
+        return self._serial
 
     def get_data(self, name):
         return self._data_nodes[name].get_value()
+
+    def get_error(self, name):
+        return self._error_nodes[name].get_value()
+
+    def get_method(self, name):
+        if name in self._method_names_to_ids:
+            return name
 
     def set_data(self, name, value):
         variant = opcua.ua.DataValue(opcua.ua.Variant(value))
@@ -279,22 +270,17 @@ class OPCUADeviceModel(BaseDeviceModel):
         logger.info("Error node [{}] set to: {}".format(name, value))
 
     def start_subscriptions(self):
-        """Add a OPCUADeviceModel as a child of this device.
-
-        Parameters
-        ----------
-        child : psct_gui.backend.device_models.OPCUADeviceModel
-            OPCUADeviceModel to add as a child.
-
-        """
-        for n, node_dict in [('data', self._data_nodes),
-                             ('errors', self._error_nodes)]:
+        #for n, node_dict in [('data', self._data_nodes),
+        #                    ('errors', self._error_nodes)]:
+        for n, node_dict in [('errors', self._error_nodes)]:
             if n == 'data':
                 DEFAULT_SUBSCRIPTION_PERIOD = (
                     OPCUADeviceModel.DEFAULT_DATA_SUBSCRIPTION_PUBLISH_INTERVAL)
             elif n == 'errors':
                 DEFAULT_SUBSCRIPTION_PERIOD = (
                     OPCUADeviceModel.DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL)
+            else:
+                raise ValueError("Invalid data type found for subscription.")
 
             for node_name in node_dict:
                 # If node is provided in sub_periods, use provided custom
@@ -383,14 +369,13 @@ class OPCUADeviceModel(BaseDeviceModel):
             self._method_names_to_ids[method_name], *args)
         logger.info("Device {} - Method {} returned. Return vals: {}".format(
             self.name, method_name, return_values))
-        if self._busy:
-            if self._socketio_server:
-                self._socketio_server.emit('method_return', {
-                    'device_id': self.id,
-                    'method_name': method_name,
-                    'args': args,
-                    'return_values': return_values})
-                self._busy = False
+        if self._busy and self._socketio_server:
+            self._socketio_server.emit('method_return', {
+                'device_id': self.id,
+                'method_name': method_name,
+                'args': args,
+                'return_values': return_values})
+            self._busy = False
 
     def call_stop(self):
         self._obj_node.call_method(self._method_names_to_ids['Stop'])
@@ -400,14 +385,6 @@ class OPCUADeviceModel(BaseDeviceModel):
                 'device_id': self.id})
         self._busy = False
 
-    def read(self):
-        self._data = {node_name: self._data_nodes[node_name].get_value()
-                      for node_name in self._data_nodes}
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
-                        for node_name in self._error_nodes}
-
-
-
 class TelescopeModel(OPCUADeviceModel):
     """Model class for a telescope device."""
 
@@ -415,7 +392,7 @@ class TelescopeModel(OPCUADeviceModel):
     TYPE_NODE_ID = "placeholder_telescope"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a TelescopeModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
@@ -427,17 +404,14 @@ class MirrorModel(OPCUADeviceModel):
 
     Attributes
     ----------
-    MIRROR_TYPE_NODE_NAME: str
-        Browse name for the node containing the mirror type.
 
     """
 
     DEVICE_TYPE_NAME = "Mirror"
     TYPE_NODE_ID = "ns=2;i=100"
-    MIRROR_TYPE_NODE_NAME = ''
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a MirrorModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
@@ -445,8 +419,8 @@ class MirrorModel(OPCUADeviceModel):
 
         try:
             self.mirror_type = self._obj_node.get_child(
-                [MirrorModel.MIRROR_TYPE_NODE_NAME]).get_value()
-        except Exception:
+                ["2:Position"]).get_value()
+        except:
             self.mirror_type = None
 
 
@@ -455,26 +429,20 @@ class PanelModel(OPCUADeviceModel):
 
     Attributes
     ----------
-    PANEL_NUMBER_NODE_NAME: str
-        Browse name for the node containing the panel position number.
-
     """
 
     DEVICE_TYPE_NAME = "Panel"
     TYPE_NODE_ID = "ns=2;i=2000"
-    PANEL_NUMBER_NODE_NAME = ''
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a PanelModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
                          sub_periods=sub_periods)
-        try:
-            self.panel_number = self._obj_node.get_child(
-                [self.PANEL_NUMBER_NODE_NAME]).get_value()
-        except Exception:
-            self.panel_number = self.name.split('_')[1]
+
+        self.adjacent_panels = []
+        self.panel_number = str(self.position)
 
         if self.panel_number[0] == '0':
             self.mirror = 'other'
@@ -488,6 +456,12 @@ class PanelModel(OPCUADeviceModel):
             elif self.panel_number[0] == '2':
                 self.mirror = 'secondary'
                 mirror_identifier = 'S'
+            elif self.panel_number[0] == '3':
+                self.mirror = 'test'
+                mirror_identifier = 'P'
+            else:
+                raise ValueError("Panel with invalid mirror (first digit) found")
+
             self.ring_number = self.panel_number[2]
             if self.ring_number == '1':
                 self.ring = 'inner'
@@ -510,7 +484,6 @@ class PanelModel(OPCUADeviceModel):
         distinct from this panel.
 
         """
-        self.adjacent_panels = []
         for edge_model in self.edges:
             for panel in edge_model.panels:
                 if panel != self:
@@ -527,15 +500,12 @@ class PanelModel(OPCUADeviceModel):
 
         self.call_method_background('MoveToCoords')
 
-    def read(self):
-        self.call_method('Read')
-        self._data = {node_name: self._data_nodes[node_name].get_value()
-                      for node_name in self._data_nodes}
-        self._errors = {node_name: self._error_nodes[node_name].get_value()
-                        for node_name in self._error_nodes}
-
     def stop(self):
-        self.call_stop()
+        return self.call_stop()
+
+    @property
+    def position_info(self):
+        return self._position_info
 
 
 class EdgeModel(OPCUADeviceModel):
@@ -545,7 +515,7 @@ class EdgeModel(OPCUADeviceModel):
     TYPE_NODE_ID = "ns=2;i=1000"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a EdgeModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
@@ -559,7 +529,7 @@ class ActuatorModel(OPCUADeviceModel):
     TYPE_NODE_ID = "ns=2;i=2100"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a ActuatorModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
@@ -573,7 +543,7 @@ class MPESModel(OPCUADeviceModel):
     TYPE_NODE_ID = "ns=2;i=1100"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a MPESModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
@@ -587,7 +557,7 @@ class GASSystemModel(OPCUADeviceModel):
     TYPE_NODE_ID = "placeholder_gas"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a PositionerModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
@@ -601,7 +571,7 @@ class PointingSystemModel(OPCUADeviceModel):
     TYPE_NODE_ID = "placeholder_pointing"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a PointingSystemModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
@@ -615,7 +585,7 @@ class PositionerModel(OPCUADeviceModel):
     TYPE_NODE_ID = "placeholder_positioner"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
-                 sub_periods={}):
+                 sub_periods=None):
         """Instantiate a PositionerModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,

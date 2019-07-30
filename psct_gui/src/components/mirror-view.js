@@ -4,13 +4,14 @@ import { PageViewElement } from './page-view-element.js'
 // These are the shared styles needed by this element.
 import { PaperFontStyles, ViewStyles } from './shared-styles.js'
 
-import '../components/info-window-widget.js';
-import '../components/mirror-widget.js';
+import '../components/info-window-widget.js'
+import '../components/mirror-widget.js'
 
 class MirrorView extends PageViewElement {
   constructor () {
     super()
-    this.selectedDeviceID = null
+    // At startup, no device selected
+    this.selectedDeviceInfo = { id: null, type: '' }
   }
 
   render () {
@@ -39,7 +40,7 @@ class MirrorView extends PageViewElement {
             <mirror-widget @changed-selected-device="${this._onChangedSelectedDevice}"></mirror-widget>
           </div>
           <div style="flex-grow: 2">
-            <info-window-widget deviceID="${this.selectedDeviceID}"></info-window-widget>
+            <info-window-widget .deviceToRequest="${this.selectedDeviceInfo}"></info-window-widget>
           </div>
         </div>
       </div>
@@ -47,13 +48,13 @@ class MirrorView extends PageViewElement {
     `
   }
 
-  _onChangedSelectedDevice(e){
-    this.selectedDeviceID = e.detail
+  _onChangedSelectedDevice (e) {
+    this.selectedDeviceInfo = e.detail
   }
 
   static get properties () {
     return {
-      selectedDeviceID: { type: String }
+      selectedDeviceInfo: { type: Object }
     }
   }
 }

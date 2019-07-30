@@ -1,8 +1,6 @@
 import { LitElement, html } from '@polymer/lit-element';
 import { setPassiveTouchGestures } from '@polymer/polymer/lib/utils/settings.js';
-import { connect } from 'pwa-helpers/connect-mixin.js';
 import { installMediaQueryWatcher } from 'pwa-helpers/media-query.js';
-import { installOfflineWatcher } from 'pwa-helpers/network.js';
 import { installRouter } from 'pwa-helpers/router.js';
 import { updateMetadata } from 'pwa-helpers/metadata.js';
 import { SharedStyles, PaperFontStyles } from './shared-styles.js';
@@ -50,8 +48,8 @@ class MyApp extends LitElement {
       text-decoration: none; /* no underline */
     }
     .main-content {
-      margin-left: 0px;
-      margin-right: 0px;
+      margin-left: 0;
+      margin-right: 0;
       height: auto;
       min-height: 100% !important;
       overflow: auto;
@@ -203,7 +201,7 @@ class MyApp extends LitElement {
     this._drawerForceNarrow = true
   }
 
-  firstUpdated() {
+  firstUpdated (_changedProperties) {
     installRouter((location) => this._locationChanged(location));
     installMediaQueryWatcher(`(min-width: 460px)`,
         (matches) => this._layoutChanged(matches));
@@ -213,7 +211,7 @@ class MyApp extends LitElement {
 }
 
   // Dynamic layout
-  _layoutChanged(isWideLayout) {
+  _layoutChanged() {
     // The drawer doesn't make sense in a wide layout, so if it's opened, close it.
     this._updateDrawerState(false);
   }
@@ -245,8 +243,7 @@ class MyApp extends LitElement {
       if (this._loggedIn === true) {
         switch(page) {
           case 'dashboard':
-            import('../components/dashboard-view.js').then((module) => {
-            });
+            import('../components/dashboard-view.js').then(() => {});
             break;
           case 'mirror':
             import('../components/mirror-view.js');
@@ -275,8 +272,7 @@ class MyApp extends LitElement {
 
   // Header button interactions
   _menuButtonClicked() {
-    var drawerLayout = this.shadowRoot.getElementById('drawerLayout')
-    var drawer = this.shadowRoot.getElementById('drawer')
+    const drawerLayout = this.shadowRoot.getElementById('drawerLayout')
     if (this._drawerForceNarrow || !drawerLayout.narrow) {
       this._drawerForceNarrow = !this._drawerForceNarrow
     } else {
@@ -285,7 +281,7 @@ class MyApp extends LitElement {
   }
 
   _userButtonClicked() {
-    var userInfo = this.shadowRoot.getElementById('userInfo')
+    const userInfo = this.shadowRoot.getElementById('userInfo')
     userInfo.open()
   }
 
@@ -328,19 +324,19 @@ class MyApp extends LitElement {
     }
   }
 
-  _loginButtonClicked(e) {
+  _loginButtonClicked() {
     this._loadPage('login');
   }
 
-  _loginSubmitButtonClicked(e) {
-    var usernameInput = this.shadowRoot.getElementById('username-input')
-    var passwordInput = this.shadowRoot.getElementById('password-input')
+  _loginSubmitButtonClicked() {
+    const usernameInput = this.shadowRoot.getElementById('username-input')
+    const passwordInput = this.shadowRoot.getElementById('password-input')
 
     usernameInput.invalid = false
     passwordInput.invalid = false
 
-    var username = usernameInput.value
-    var password = passwordInput.value
+    const username = usernameInput.value
+    const password = passwordInput.value
     if (username === "") {
       usernameInput.errorMessage = "Username required."
       usernameInput.invalid = true
@@ -352,7 +348,7 @@ class MyApp extends LitElement {
       return
     }
 
-    var authenticateResult = this._authenticate(username, password)
+    const authenticateResult = this._authenticate(username, password)
     if (authenticateResult.success) {
       this._user = username
       this._permissions = authenticateResult.permission

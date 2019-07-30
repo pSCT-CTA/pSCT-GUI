@@ -15,7 +15,7 @@ class DashboardView extends PageViewElement {
   constructor () {
     super()
     // At startup, no device selected
-    this.selectedDeviceID = null
+    this.selectedDeviceInfo = {id: null, type:""}
   }
 
   render () {
@@ -36,12 +36,12 @@ class DashboardView extends PageViewElement {
               <device-tree-widget @changed-selected-device="${this._onChangedSelectedDevice}"></device-tree-widget>
             </div>
             <div style="flex-grow: 1; height: 200%">
-              <info-window-widget deviceID="${this.selectedDeviceID}"></info-window-widget>
+              <info-window-widget .deviceToRequest="${this.selectedDeviceInfo}"></info-window-widget>
             </div>
           </div>
           <div class="flex-container">
             <div style="flex-grow: 8">
-              <error-table-widget></error-table-widget>
+              <error-table-widget @changed-selected-device="${this._onChangedSelectedDevice}"></error-table-widget>
             </div>
           </div>
           <div class="flex-container">
@@ -55,12 +55,12 @@ class DashboardView extends PageViewElement {
   }
 
   _onChangedSelectedDevice(e){
-    this.selectedDeviceID = e.detail
+    this.selectedDeviceInfo = e.detail
   }
 
   static get properties () {
     return {
-      selectedDeviceID: { type: String }
+      selectedDeviceInfo: { type: Object }
     }
   }
 }

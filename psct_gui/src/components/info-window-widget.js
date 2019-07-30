@@ -1,82 +1,65 @@
-import { LitElement, html } from '@polymer/lit-element';
+import { html } from '@polymer/lit-element'
 
+import { getErrorDescFromName, getErrorNumFromName, getErrorSeverityFromName } from '../utilities.js'
 import { PaperFontStyles } from './shared-styles.js'
 import { WidgetCard } from './widget-card.js'
 import { BaseSocketioDeviceClient } from '../socketio-device-client.js'
 
-import '@polymer/paper-progress/paper-progress.js';
-import '@polymer/paper-button/paper-button.js';
+import '@polymer/paper-progress/paper-progress.js'
+import '@polymer/paper-button/paper-button.js'
 
-import '@vaadin/vaadin-grid/vaadin-grid.js';
-import '@vaadin/vaadin-grid/vaadin-grid-sorter.js';
-import '@vaadin/vaadin-grid/vaadin-grid-filter-column.js';
-import '@vaadin/vaadin-checkbox/vaadin-checkbox.js';
-import '@vaadin/vaadin-dialog/vaadin-dialog.js';
-import '@vaadin/vaadin-select/vaadin-select.js';
-
-class InfoWindowWidgetClient extends BaseSocketioDeviceClient {
-  constructor (address, component) {
-    super(address, component)
-  }
-
-  on_data_change(data) {
-    if (data.device_id === this.component.deviceID) {
-      if (data.data_type === "data") {
-        var i = this.component.deviceData.findIndex(x => x.name === data.name)
-        if (i > -1) {
-          // Flash color change
-          this.component.deviceData[i].value = (Number.isInteger(data.value)) ? data.value : data.value.toFixed(6)
-        }
-      }
-      else if (data.data_type === "error") {
-        if (data.value == true) {
-          this.component.deviceErrors.push({
-            errorCode: data.name,
-            severity: "Fatal",
-            severityIndex: 3,
-            timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
-            description: "Test Description"
-          })
-        }
-        else {
-          var i = this.component.deviceData.findIndex(x => x.errorCode == data.name)
-          if (i > -1) {
-            this.component.deviceErrors.splice(i, 1)
-          }
-        }
-      }
-    }
-    this.component.requestUpdate()
-  }
-}
+import '@vaadin/vaadin-grid/vaadin-grid.js'
+import '@vaadin/vaadin-grid/vaadin-grid-sorter.js'
+import '@vaadin/vaadin-grid/vaadin-grid-filter-column.js'
+import '@vaadin/vaadin-checkbox/vaadin-checkbox.js'
+import '@vaadin/vaadin-dialog/vaadin-dialog.js'
+import '@vaadin/vaadin-select/vaadin-select.js'
 
 class InfoWindowWidget extends WidgetCard {
-  constructor() {
+  constructor () {
     super()
     this.name = 'Info'
+
     this._dialogOpen = false
 
-
-    this.deviceName = ""
-    this.deviceType = ""
+    this._deviceID = null
+    this.deviceName = ''
+    this.deviceType = ''
     this.deviceData = []
     this.deviceErrors = []
-    this.deviceStatus = 3
+    this.deviceState = 0
+    this.deviceErrorState = 0
     this.deviceMethods = []
 
-    this.socketioClient = new InfoWindowWidgetClient("http://localhost:5000", this)
+    this.dataRequest = {
+      component_name: this.name,
+      fields: {
+        All: {
+          data: 'All',
+          errors: 'All',
+          methods: 'All'
+        }
+      },
+      device_ids: []
+    }
+
+    this.deviceToRequest = { deviceID: null, deviceType: '' }
+
+    this.socketioClient = new BaseSocketioDeviceClient('http://localhost:5000', this)
     this.socketioClient.connect()
+    this.socketioClient.requestData(this.dataRequest)
   }
 
-  static get properties() {
-    var properties = super.properties
+  static get properties () {
+    let properties = super.properties
     Object.assign(properties, {
       deviceID: { type: String },
       deviceName: { type: String },
       deviceType: { type: String },
       deviceData: { type: Array },
       deviceErrors: { type: Array },
-      deviceStatus: { type: Number },
+      deviceState: { type: Number },
+      deviceErrorState: { type: Number },
       deviceMethods: { type: Array },
       _dialogOpen: { type: Boolean }
     })
@@ -84,10 +67,9 @@ class InfoWindowWidget extends WidgetCard {
     return properties
   }
 
-  get contentTemplate() {
+  get contentTemplate () {
     return html`
-    ${this.deviceID !== null?
-      html`
+
       ${PaperFontStyles}
       <style>
       paper-progress.red {
@@ -99,38 +81,97 @@ class InfoWindowWidget extends WidgetCard {
       paper-progress.yellow {
         --paper-progress-active-color: #ffeb3b;
       }
+      paper-progress.gray {
+        --paper-progress-active-color: #b2b2b2;
+      }
       .paper-font-title {
         margin: 3px;
       }
-      .status-display > paper-progress, .status-display > div {
+      .error-status-display > paper-progress, .error-status-display > div {
         display: inline-block;
       }
       #call-method-button {
         color: black;
-        background-color: #white;
+        background-color: white;
         width: 125px;
       }
+      .info-header {
+        margin: 5px;
+      }
+      .badge {
+        width: 50px;
+        border-radius: 3px;
+        color: black;
+        text-align: center;
+        display:inline-block;
+      }
+      .gray {
+        background-color: gray;
+      }
+      .red {
+        background-color: red;
+      }
+      .yellow {
+        background-color: yellow;
+      }
+      .green {
+        background-color: lime;
+      }
+      vaadin-grid-cell-content {
+         word-wrap: break-word;
+         white-space: normal;
+      }
       </style>
-      <div class="info-header paper-font-headline">${this.deviceName}</div>
+
+      ${this.deviceID === null || this.deviceID === 'null'
+    ? html`
+    <div class="info-header paper-font-display1">Device Not Found</div>
       <div class="status-display">
-        ${this.deviceStatus===3?
-            html`<paper-progress value="100" class="green"></paper-progress> <div class="paper-font-subhead">Nominal</div>`:
-            html``
-          }
-        ${this.deviceStatus===2?
-            html`<paper-progress value="66" class="yellow""></paper-progress> <div class="paper-font-subhead">Operable</div>`:
-            html``
-          }
-        ${this.deviceStatus===1?
-            html`<paper-progress value="33" class="red"></paper-progress> <div class="paper-font-subhead">Fatal</div>`:
-            html``
-          }
+        <div class="paper-font-headline" style="display:inline-block;">${this.deviceType}</div>
+        <p class="badge gray paper-font-body1">N/A</p>
       </div>
-      <div class="paper-font-subhead">${this.deviceType}</div>
+      <div class="error-status-display">
+        <paper-progress value="100" class="gray"></paper-progress> <div class="paper-font-subhead">N/A</div>
+      </div>
+      <br>
+      <div class="info-body">
+        <div class="paper-font-body2">No data. Device is not found in server.</div>
+      </div>`
+    : html`
+      <div class="info-header paper-font-display1">${this.deviceName}</div>
+      <div class="status-display">
+      <div class="paper-font-headline" style="display:inline-block;">${this.deviceType}</div>
+        ${this.deviceState === 2
+    ? html`<p class="badge yellow paper-font-body1">Busy</p>`
+    : html``
+}
+        ${this.deviceState === 1
+    ? html`<p class="badge green paper-font-body1">On</p>`
+    : html``
+}
+        ${this.deviceState === 0
+    ? html`<p class="badge gray paper-font-body1">Off</p>`
+    : html``
+}
+      </div>
+      <div class="error-status-display">
+        ${this.deviceErrorState === 0
+    ? html`<paper-progress value="100" class="green"></paper-progress> <div class="paper-font-subhead">Nominal</div>`
+    : html``
+}
+        ${this.deviceErrorState === 1
+    ? html`<paper-progress value="66" class="yellow""></paper-progress> <div class="paper-font-subhead">Operable</div>`
+    : html``
+}
+        ${this.deviceErrorState === 2
+    ? html`<paper-progress value="33" class="red"></paper-progress> <div class="paper-font-subhead">Fatal</div>`
+    : html``
+}
+      </div>
       <br>
       <div class="info-body">
         <div class="paper-font-title">Properties</div>
-        <vaadin-grid items="${JSON.stringify(this.deviceData)}" height-by-rows>
+        <vaadin-grid items="${JSON.stringify(this.deviceData)}" height-by-rows size=6>
           <vaadin-grid-filter-column path="name" header="Field Name"></vaadin-grid-filter-column>
           <vaadin-grid-column path="value" header="Value"></vaadin-grid-column>
         </vaadin-grid>
@@ -152,9 +193,9 @@ class InfoWindowWidget extends WidgetCard {
             <div class="paper-font-body1"><b>Description:</b> [[item.description]]</div>
           </template>
         </vaadin-grid>
-      </div>
-
-      <vaadin-dialog id="call-method-dialog" ?opened="${this._dialogOpen}" @opened-changed="${this._onDialogOpenChanged}" no-close-on-outside-click>
+      </div>`
+}
+    <vaadin-dialog id="call-method-dialog" ?opened="${this._dialogOpen}" @opened-changed="${this._onDialogOpenChanged}" no-close-on-outside-click>
         <template id="method-dialog-content">
           <div class="paper-font-headline">Call a method.</div>
           <vaadin-select id='select-method' label='Required' placeholder='Choose a Method' required>
@@ -172,50 +213,52 @@ class InfoWindowWidget extends WidgetCard {
             <paper-button style='float: right;' id='close-button' @click="${this.closeDialog}">Close</paper-button>
           </div>
         </template>
-      </vaadin-dialog>`:
-      html``
-    }`
+    </vaadin-dialog>
+    <paper-toast id="deviceNotFoundToast" text="Device not found."></paper-toast>
+    `
   }
 
-  get actionsTemplate() {
+  get actionsTemplate () {
     return html`
     <paper-button raised id="call-method-button" @click="${this.openDialog}">Call Method</paper-button>
     `
   }
 
   // Polymer lifecycle methods
-
-  updated() {
-  // Disable stop button if the device doesn't have a stop method
-  if (!this.deviceMethods.find(device => device.name === "stop")) {
-    this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#stop-button').disabled = true
+  updated (_changedProperties) {
+    // Disable stop button if the device doesn't have a stop method
+    if (!this.deviceMethods.find(device => device.name === 'stop')) {
+      this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#stop-button').disabled = true
+    }
+    // Activate interactivity on close button
+    this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#close-button').onclick = this.closeDialog
   }
-  // Activate interactivity on close button
-  this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#close-button').onclick = this.closeDialog
-}
 
-// Event handlers
+  // Event handlers
 
-  openDialog() {
-    this._dialogOpen = true
+  openDialog () {
+    if (this.deviceID !== null && this.deviceID !== 'null') {
+      this._dialogOpen = true
+    } else {
+      this.shadowRoot.getElementById('deviceNotFoundToast').open()
+    }
   }
-  closeDialog() {
+  closeDialog () {
     this._dialogOpen = false
   }
 
   // Needed to handle case where the dialog is closed by clocking away, rather than the close button
-  _onDialogOpenChanged(e) {
+  _onDialogOpenChanged (e) {
     this._dialogOpen = e.detail.value
   }
 
-  _onRefreshButtonClicked(e) {
-    if (this.deviceID !== null && this.deviceID !== "null") {
-      this.socketioClient.request_all_data("ids", [this.deviceID])
-    }
+  refresh () {
+      this.socketioClient.requestData(this.dataRequest)
+      this.loading = true
   }
 
-  methodSelected() {
-    var selectedMethod = this.shadowRoot.querySelector('vaadin-select').value;
+  methodSelected () {
+    var selectedMethod = this.shadowRoot.querySelector('vaadin-select').value
 
     // Replace input-options-box with fields to input coordinates (if necessary)
     // Add submit button, if necessary
@@ -223,67 +266,90 @@ class InfoWindowWidget extends WidgetCard {
     // If there are no arguments, un-disable execute button
   }
 
-  submitArguments() {
+  submitArguments () {
     // Write all arguments
     // Un-disable execute button
   }
 
-  executeMethod() {
+  executeMethod () {
     // Send method call
   }
 
-  stopMethod() {
+  stopMethod () {
     // Call stop method (on seperate thread)
   }
-
-  setAllData(data)  {
-    var deviceAllData = data[this.deviceID]
-
-    this.deviceName = deviceAllData.name
-    this.deviceType = deviceAllData.type
-
-    var dataFields = []
-    for (var d in deviceAllData.data) {
-        if (deviceAllData.data.hasOwnProperty(d)) {
-
-           dataFields.push({
-             name: d,
-             value: (Number.isInteger(deviceAllData.data[d])) ? deviceAllData.data[d] : deviceAllData.data[d].toFixed(6)
-           })
-        }
-    }
-    this.deviceData = dataFields
-
-    var errors = []
-    for (var e in deviceAllData.errors) {
-        if (deviceAllData.errors.hasOwnProperty(e)) {
-           errors.push({
-             errorCode: e,
-             severity: "Fatal",
-             severityIndex: 3,
-             timeString: (new Date(2018, 12, 1, 9, 30)).toISOString(),
-             description: "Test Description"
-           })
-        }
-    }
-    this.deviceErrors = errors
-
-    this.deviceStatus = 3
-    this.deviceMethods = deviceAllData.methods
-
-    this.requestUpdate()
-  }
-
   // Getter and setter for deviceID property
 
-  get deviceID() { return this._deviceID; }
+  get deviceID () { return this._deviceID }
 
-  set deviceID(newID) {
-    let oldDeviceID = this.deviceID;
-    this._deviceID = newID;
-    if (newID !== null && newID !== "null") {
-      this.socketioClient.request_all_data("ids", [newID])
+  set deviceToRequest (device) {
+    if (device.deviceID !== null && device.deviceID !== 'null') {
+      this._deviceID = device.deviceID
+      this.dataRequest.device_ids = { [device.deviceType]: [device.deviceID] }
+      this.refresh()
+    } else {
+      this.dataRequest.device_ids = []
     }
+  }
+
+  _onRequestedData (data) {
+    console.log(data)
+    let device = null
+    if (Object.keys(data).length === 0) {
+      this.loading = false
+      return
+    }
+
+    for (let deviceType in data) {
+      if (data.hasOwnProperty(deviceType)) {
+        for (let deviceId in data[deviceType]) {
+          if (data[deviceType].hasOwnProperty(deviceId)) {
+            device = data[deviceType][deviceId]
+          }
+        }
+      }
+    }
+
+    let dataFields = []
+    for (let d in device.data) {
+      if (device.data.hasOwnProperty(d)) {
+        let formattedOutput
+        if (typeof device.data[d] === 'string') {
+          formattedOutput = device.data[d]
+        } else if (Number.isInteger(device.data[d])) {
+          formattedOutput = device.data[d]
+        } else {
+          formattedOutput = device.data[d].toFixed(6)
+        }
+        dataFields.push({
+          name: d,
+          value: formattedOutput
+        })
+      }
+    }
+
+    let errorFields = []
+    for (let e in device.errors) {
+      if (device.errors.hasOwnProperty(e) && device.errors[e]) {
+        errorFields.push({
+          errorCode: getErrorNumFromName(e),
+          severity: getErrorSeverityFromName(e)[1],
+          severityIndex: getErrorSeverityFromName(e)[0],
+          timeString: (new Date()).toISOString(),
+          description: getErrorDescFromName(e)
+        })
+      }
+    }
+
+    this.deviceName = device.deviceName.replace(/_/g, ' ')
+    this.deviceType = device.deviceType
+    this.deviceState = device.data.State
+    this.deviceErrorState = device.data.ErrorState
+    this.deviceData = dataFields
+    this.deviceErrors = errorFields
+    this.deviceMethods = device.methods
+
+    this.loading = false
   }
 }
 

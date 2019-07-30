@@ -36,13 +36,13 @@ app-drawer {
   overflow: auto;
 }
 .view-content {
-  margin-left: 10 px
+  margin-left: 10px;
 }
 [hidden] {
   display: none !important;
 }
 </style>
-`;
+`
 
 export const IronFlexLayoutStyles = html`
 <style>
@@ -220,7 +220,7 @@ export const IronFlexLayoutStyles = html`
     align-content: space-around;
   }
 </style>
-`;
+`
 
 export const PaperFontStyles = html`
 <style>
@@ -348,10 +348,16 @@ styles. All other styles should exist as single lines."
   font-weight: 500;
   line-height: 20px;
 }
-</style>`;
+</style>`
 
 export const WidgetStyles = html`
 <style>
+  [hidden] {
+    display: none;
+  }
+  .title {
+    margin: 5px;
+  }
   paper-card {
     width: 100%;
     transition: width 0.5s, height 0.5s;
@@ -363,17 +369,21 @@ export const WidgetStyles = html`
     top: 0;
     left: 0;
   }
-  .card-actions > paper-icon-button {
+  .card-actions > .custom-actions {
+    float: left;
+  }
+  .card-actions > .shared-actions {
     float: right;
+  }
+  .shared-actions > paper-icon-button {
     padding: 10px 0;
     width: 50px;
     height: 50px;
   }
-  .card-actions > paper-button {
-    float: left;
+  .custom-actions > paper-button {
     padding: 10px 0;
   }
-</style>`;
+</style>`
 
 export const ViewStyles = html`
 <style>
@@ -392,4 +402,4 @@ export const ViewStyles = html`
 .full-height {
   height: 100%;
 }
-</style>`;
+</style>`

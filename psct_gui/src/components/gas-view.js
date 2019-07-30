@@ -3,8 +3,7 @@ import { PageViewElement } from './page-view-element.js'
 
 // These are the shared styles needed by this element.
 import { PaperFontStyles, ViewStyles } from './shared-styles.js'
-
-import '../components/widget-card.js';
+import '../components/widget-card.js'
 
 class GASView extends PageViewElement {
   render () {
