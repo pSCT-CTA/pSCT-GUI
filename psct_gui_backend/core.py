@@ -7,11 +7,11 @@ import select
 import socketio
 import eventlet
 eventlet.monkey_patch()
-#from flask import Flask
-#from sanic import Sanic
+# from flask import Flask
+# from sanic import Sanic
 
-#from gevent import pywsgi
-#from geventwebsocket.handler import WebSocketHandler
+# from gevent import pywsgi
+# from geventwebsocket.handler import WebSocketHandler
 
 import opcua
 
@@ -119,11 +119,11 @@ class BackendServer(object):
                 data[device_type] = {}
                 if device_ids[device_type] == "All":
                     device_ids[device_type] = list(self.device_models_by_type[device_type].keys())
-                elif device_ids[device_type]  == "Primary":
+                elif device_ids[device_type] == "Primary":
                     device_ids[device_type] = list(self.device_models_by_mirror["primary"][device_type].keys())
-                elif device_ids[device_type]  == "Secondary":
+                elif device_ids[device_type] == "Secondary":
                     device_ids[device_type] = list(self.device_models_by_mirror["secondary"][device_type].keys())
-                elif device_ids[device_type]  == "Test":
+                elif device_ids[device_type] == "Test":
                     device_ids[device_type] = list(self.device_models_by_mirror["test"][device_type].keys())
 
                 example_object = self.device_models_by_type[device_type][device_ids[device_type][0]]
@@ -133,21 +133,21 @@ class BackendServer(object):
                         if field_type == "data":
                             if fields["All"][field_type] == "All":
                                 var_names = list(example_object._data_nodes.keys())
-                            else :
+                            else:
                                 var_names = fields["All"][field_type]
                             for data_field_name in var_names:
                                 fields_to_retrieve[field_type].add(data_field_name)
                         elif field_type == "errors":
                             if fields["All"][field_type] == "All":
                                 var_names = list(example_object._error_nodes.keys())
-                            else :
+                            else:
                                 var_names = fields["All"][field_type]
                             for error_field_name in var_names:
                                 fields_to_retrieve[field_type].add(error_field_name)
                         elif field_type == "methods":
                             if fields["All"][field_type] == "All":
                                 var_names = list(example_object._method_names_to_ids.keys())
-                            else :
+                            else:
                                 var_names = fields["All"][field_type]
                             for method_field_name in var_names:
                                 fields_to_retrieve[field_type].add(method_field_name)
@@ -157,22 +157,22 @@ class BackendServer(object):
                         if field_type == "data":
                             if fields[device_type][field_type] == "All":
                                 var_names = list(example_object._data_nodes.keys())
-                            else :
-                                var_names = fields["All"][field_type]
+                            else:
+                                var_names = fields[device_type][field_type]
                             for data_field_name in var_names:
                                 fields_to_retrieve[field_type].add(data_field_name)
                         elif field_type == "errors":
                             if fields[device_type][field_type] == "All":
                                 var_names = list(example_object._error_nodes.keys())
-                            else :
-                                var_names = fields["All"][field_type]
+                            else:
+                                var_names = fields[device_type][field_type]
                             for error_field_name in var_names:
                                 fields_to_retrieve[field_type].add(error_field_name)
                         elif field_type == "methods":
                             if fields[device_type][field_type] == "All":
                                 var_names = list(example_object._method_names_to_ids.keys())
-                            else :
-                                var_names = fields["All"][field_type]
+                            else:
+                                var_names = fields[device_type][field_type]
                             for method_field_name in var_names:
                                 fields_to_retrieve[field_type].add(method_field_name)
 
@@ -248,21 +248,21 @@ class BackendServer(object):
         # Group devices by mirror
         logger.info("Categorizing all devices by mirror...")
         for mirrorId in self.device_models_by_type["Mirror"]:
-            mirrorDevice = self.device_models_by_type["Mirror"][mirrorId]
-            if mirrorDevice.position == "1":
+            mirror_device = self.device_models_by_type["Mirror"][mirrorId]
+            if mirror_device.position == "1":
                 mirror_name = "primary"
-            elif mirrorDevice.position == "2":
+            elif mirror_device.position == "2":
                 mirror_name = "secondary"
-            elif mirrorDevice.position == "3":
+            elif mirror_device.position == "3":
                 mirror_name = "test"
             else:
                 raise ValueError("Invalid mirror name.")
 
             # Get mirror
-            self.device_models_by_mirror[mirror_name]["Mirror"] = {mirrorId: mirrorDevice}
+            self.device_models_by_mirror[mirror_name]["Mirror"] = {mirrorId: mirror_device}
 
             # Get all panels
-            for panelChild in mirrorDevice.children["Panel"]:
+            for panelChild in mirror_device.children["Panel"]:
                 if "Panel" not in self.device_models_by_mirror[mirror_name]:
                     self.device_models_by_mirror[mirror_name]["Panel"] = {}
                 self.device_models_by_mirror[mirror_name]["Panel"][panelChild.id] = panelChild
@@ -273,13 +273,13 @@ class BackendServer(object):
                     self.device_models_by_mirror[mirror_name]["Actuator"][actuatorChild.id] = actuatorChild
 
             # Get all edges
-            for edgeChild in mirrorDevice.children["Edge"]:
+            for edgeChild in mirror_device.children["Edge"]:
                 if "Edge" not in self.device_models_by_mirror[mirror_name]:
                     self.device_models_by_mirror[mirror_name]["Edge"] = {}
                 self.device_models_by_mirror[mirror_name]["Edge"][edgeChild.id] = edgeChild
 
             # Get all sensors
-            for mpesChild in mirrorDevice.children["MPES"]:
+            for mpesChild in mirror_device.children["MPES"]:
                 if "MPES" not in self.device_models_by_mirror[mirror_name]:
                     self.device_models_by_mirror[mirror_name]["MPES"] = {}
                 self.device_models_by_mirror[mirror_name]["MPES"][mpesChild.id] = mpesChild
@@ -304,7 +304,8 @@ class BackendServer(object):
                     node, self.opcua_client, socketio_server=self.sio)
                 if self.device_models[node.nodeid.to_string()].DEVICE_TYPE_NAME not in self.device_models_by_type:
                     self.device_models_by_type[self.device_models[node.nodeid.to_string()].DEVICE_TYPE_NAME] = {}
-                self.device_models_by_type[self.device_models[node.nodeid.to_string()].DEVICE_TYPE_NAME][node.nodeid.to_string()] = self.device_models[node.nodeid.to_string()]
+                self.device_models_by_type[self.device_models[node.nodeid.to_string()].DEVICE_TYPE_NAME][
+                    node.nodeid.to_string()] = self.device_models[node.nodeid.to_string()]
                 recurse = True
 
             if parent_model:
@@ -367,28 +368,10 @@ if __name__ == "__main__":
 
     logger.info("Starting OPC UA client for address {}".format(args.opcua_server_address))
     opcua_client = opcua.Client(args.opcua_server_address, timeout=300)
-    #sio = socketio.Server(async_mode="threading", ping_timeout=120)
-    sio = socketio.Server(async_mode='eventlet', ping_timeout=300, ping_interval=300, allow_upgrades=False)
-    #sio = socketio.AsyncServer(async_mode='sanic')
+    sio = socketio.Server(async_mode='eventlet', ping_timeout=300, ping_interval=300, allow_upgrades=True)
 
     serv = BackendServer(opcua_client, sio)
     serv.initialize_device_models("2:DeviceTree")
-
-    #app = Flask(__name__)
-    #app.wsgi_app = socketio.Middleware(sio, app.wsgi_app)
-    #app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
-    #app.run(threaded=True)
-
-
-
-    #app = Sanic()
-    #sio.attach(app)
-    #app.run(host="0.0.0.0", port=5000)
-
-    #app = socketio.WSGIApp(sio)
-    #pywsgi.WSGIServer(('', 5000), app,
-    #                  handler_class=WebSocketHandler).serve_forever()
-
     
     app = socketio.WSGIApp(sio)
     eventlet.wsgi.server(eventlet.listen(('', 5000)), app)
