@@ -1,4 +1,4 @@
-import { LitElement, html } from '@polymer/lit-element'
+import { html } from '@polymer/lit-element'
 
 import { PaperFontStyles } from './shared-styles.js'
 import { WidgetCard } from './widget-card.js'

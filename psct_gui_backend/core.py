@@ -35,12 +35,6 @@ class BackendServer(object):
         A python-opcua Client instance, connected to OPC UA alignment server.
     socketio_server : socketio.Server
         A socket.io Server instance, will connect to client browsers.
-    opcua_device_tree_node_name : str, optional
-        Browse name for root node of OPC UA device tree. Should be a child of
-        device node.
-    stop_method_id : str, optional
-        OPC UA node id for stop method.
-
     """
 
     def __init__(self,
@@ -53,6 +47,11 @@ class BackendServer(object):
 
         self.device_models = {}
         self.device_models_by_type = {}
+        self.device_models_by_mirror = {
+            "primary": {},
+            "secondary": {},
+            "test": {}
+        }
 
         @self.sio.on('connect')
         def on_connect(sid, environ):
@@ -101,62 +100,110 @@ class BackendServer(object):
         fields = request['fields']
         device_ids = request['device_ids']
 
-        if device_ids == "all":
-            device_ids = {device_type: "all" for device_type in self.device_models_by_type.keys()}
-
-        if "all" in fields:
-            fields_for_all = fields["all"]
-        else:
-            fields_for_all = {}
+        if device_ids == "All":
+            device_ids = {device_type: "All" for device_type in self.device_models_by_type.keys()}
+        elif device_ids == "Primary":
+            device_ids = {device_type: "Primary" for device_type in self.device_models_by_type.keys()}
+        elif device_ids == "Secondary":
+            device_ids = {device_type: "Secondary" for device_type in self.device_models_by_type.keys()}
+        elif device_ids == "Test":
+            device_ids = {device_type: "Test" for device_type in self.device_models_by_type.keys()}
 
         for device_type in device_ids:
+            fields_to_retrieve = {
+                'data': set(),
+                'errors': set(),
+                'methods': set()
+            }
             if device_type in self.device_models_by_type:
                 data[device_type] = {}
-                if device_ids[device_type] == "all":
-                    device_ids[device_type] = self.device_models_by_type[device_type].keys()
+                if device_ids[device_type] == "All":
+                    device_ids[device_type] = list(self.device_models_by_type[device_type].keys())
+                elif device_ids[device_type]  == "Primary":
+                    device_ids[device_type] = list(self.device_models_by_mirror["primary"][device_type].keys())
+                elif device_ids[device_type]  == "Secondary":
+                    device_ids[device_type] = list(self.device_models_by_mirror["secondary"][device_type].keys())
+                elif device_ids[device_type]  == "Test":
+                    device_ids[device_type] = list(self.device_models_by_mirror["test"][device_type].keys())
+
+                example_object = self.device_models_by_type[device_type][device_ids[device_type][0]]
+
+                if "All" in fields:
+                    for field_type in fields["All"]:
+                        if field_type == "data":
+                            if fields["All"][field_type] == "All":
+                                var_names = list(example_object._data_nodes.keys())
+                            else :
+                                var_names = fields["All"][field_type]
+                            for data_field_name in var_names:
+                                fields_to_retrieve[field_type].add(data_field_name)
+                        elif field_type == "errors":
+                            if fields["All"][field_type] == "All":
+                                var_names = list(example_object._error_nodes.keys())
+                            else :
+                                var_names = fields["All"][field_type]
+                            for error_field_name in var_names:
+                                fields_to_retrieve[field_type].add(error_field_name)
+                        elif field_type == "methods":
+                            if fields["All"][field_type] == "All":
+                                var_names = list(example_object._method_names_to_ids.keys())
+                            else :
+                                var_names = fields["All"][field_type]
+                            for method_field_name in var_names:
+                                fields_to_retrieve[field_type].add(method_field_name)
+
+                if device_type in fields:
+                    for field_type in fields[device_type]:
+                        if field_type == "data":
+                            if fields[device_type][field_type] == "All":
+                                var_names = list(example_object._data_nodes.keys())
+                            else :
+                                var_names = fields["All"][field_type]
+                            for data_field_name in var_names:
+                                fields_to_retrieve[field_type].add(data_field_name)
+                        elif field_type == "errors":
+                            if fields[device_type][field_type] == "All":
+                                var_names = list(example_object._error_nodes.keys())
+                            else :
+                                var_names = fields["All"][field_type]
+                            for error_field_name in var_names:
+                                fields_to_retrieve[field_type].add(error_field_name)
+                        elif field_type == "methods":
+                            if fields[device_type][field_type] == "All":
+                                var_names = list(example_object._method_names_to_ids.keys())
+                            else :
+                                var_names = fields["All"][field_type]
+                            for method_field_name in var_names:
+                                fields_to_retrieve[field_type].add(method_field_name)
 
                 for device_id in device_ids[device_type]:
                     if device_id in self.device_models_by_type[device_type]:
                         model = self.device_models_by_type[device_type][device_id]
                         data[device_type][device_id] = {
-                            'id': model.id,
-                            'name': model.name,
-                            'type': model.type,
+                            'deviceID': model.id,
+                            'deviceName': model.name,
+                            'deviceType': model.type,
                             'position': model.position,
                             'extra_position_info': model.position_info,
                             'serial': model.serial,
-                            'children': {type: [child.id for child in model.children[type]]
-                                         for type in model.children},
+                            'children': {device_type: [child.id for child in model.children[device_type]]
+                                         for device_type in model.children},
                             'parents': [parent.id for parent in model.parents]
                         }
 
-                        fields_to_retrieve = fields_for_all
-                        if device_type in fields:
-                            fields_to_retrieve = {**fields_to_retrieve, **fields[device_type]}
-
                         for field_type in fields_to_retrieve:
                             if field_type == "data":
-                                if fields_to_retrieve["data"] == "all":
-                                    data[device_type][device_id]["data"] = model.data
-                                else:
-                                    data[device_type][device_id]["data"] = {}
-                                    for var_name in fields_to_retrieve["data"]:
-                                        data[device_type][device_id]["data"][var_name] = model.get_data(var_name)
-
+                                data[device_type][device_id][field_type] = {}
+                                for var_name in fields_to_retrieve[field_type]:
+                                    data[device_type][device_id][field_type][var_name] = model.get_data(var_name)
                             elif field_type == "errors":
-                                if fields_to_retrieve["errors"] == "all":
-                                    data[device_type][device_id]["errors"] = model.errors
-                                else:
-                                    data[device_type][device_id]["errors"] = {}
-                                    for var_name in fields_to_retrieve["errors"]:
-                                        data[device_type][device_id]["errors"][var_name] = model.get_error(var_name)
+                                data[device_type][device_id][field_type] = {}
+                                for var_name in fields_to_retrieve[field_type]:
+                                    data[device_type][device_id][field_type][var_name] = model.get_error(var_name)
                             elif field_type == "methods":
-                                if fields_to_retrieve["methods"] == "all":
-                                    data[device_type][device_id]["methods"] = model.methods
-                                else:
-                                    data[device_type][device_id]["methods"] = {}
-                                    for var_name in fields_to_retrieve["methods"]:
-                                        data[device_type][device_id]["methods"][var_name] = model.get_method(var_name)
+                                data[device_type][device_id][field_type] = []
+                                for var_name in fields_to_retrieve[field_type]:
+                                    data[device_type][device_id][field_type].append(var_name)
 
         self.sio.emit('requested_data', data, room=sid)
         logger.info('Requested data sent for component {}.'.format(
@@ -165,7 +212,7 @@ class BackendServer(object):
     def _on_call_method(self, sid, data):
         device_id = data['device_id']
         method_name = data['method_name']
-        args = data['args']
+        arguments = data['args']
 
         logger.info("Call request for method: {} on device ID: {}.".format(
             method_name, device_id))
@@ -173,22 +220,21 @@ class BackendServer(object):
         if method_name == "stop":
             self.device_models[device_id].call_stop()
         else:
-            self.device_models[device_id].call_method(method_name, args)
+            self.device_models[device_id].call_method(method_name, arguments)
 
     def _on_set_value(self, sid, data):
         device_id = data['device_id']
-        type = data['type']
+        data_type = data['type']
         name = data['name']
         value = data['value']
 
         logger.info(
-            ("Set value request for device: {}, type: {}, ".format(
-                device_id, type))
-            (" name: {}, value: {}".format(name, value)))
+            "Set value request for device: {}, type: {}, name: {}, value: {}".format(
+                device_id, data_type, name, value))
 
-        if type == 'data':
+        if data_type == 'data':
             self.device_models[device_id].set_data(name, value)
-        elif type == 'error':
+        elif data_type == 'error':
             self.device_models[device_id].set_error(name, value)
 
     def initialize_device_models(self, opcua_device_tree_node_name):
@@ -199,8 +245,44 @@ class BackendServer(object):
         for node in device_tree_root_node.get_children():
             self.__traverse_node(node, None)
 
-        # for device_model in self.device_models.values():
-        #    device_model.start_subscriptions()
+        # Group devices by mirror
+        logger.info("Categorizing all devices by mirror...")
+        for mirrorId in self.device_models_by_type["Mirror"]:
+            mirrorDevice = self.device_models_by_type["Mirror"][mirrorId]
+            if mirrorDevice.position == "1":
+                mirror_name = "primary"
+            elif mirrorDevice.position == "2":
+                mirror_name = "secondary"
+            elif mirrorDevice.position == "3":
+                mirror_name = "test"
+            else:
+                raise ValueError("Invalid mirror name.")
+
+            # Get mirror
+            self.device_models_by_mirror[mirror_name]["Mirror"] = {mirrorId: mirrorDevice}
+
+            # Get all panels
+            for panelChild in mirrorDevice.children["Panel"]:
+                if "Panel" not in self.device_models_by_mirror[mirror_name]:
+                    self.device_models_by_mirror[mirror_name]["Panel"] = {}
+                self.device_models_by_mirror[mirror_name]["Panel"][panelChild.id] = panelChild
+                # Get all their actuator children
+                for actuatorChild in panelChild.children["Actuator"]:
+                    if "Actuator" not in self.device_models_by_mirror[mirror_name]:
+                        self.device_models_by_mirror[mirror_name]["Actuator"] = {}
+                    self.device_models_by_mirror[mirror_name]["Actuator"][actuatorChild.id] = actuatorChild
+
+            # Get all edges
+            for edgeChild in mirrorDevice.children["Edge"]:
+                if "Edge" not in self.device_models_by_mirror[mirror_name]:
+                    self.device_models_by_mirror[mirror_name]["Edge"] = {}
+                self.device_models_by_mirror[mirror_name]["Edge"][edgeChild.id] = edgeChild
+
+            # Get all sensors
+            for mpesChild in mirrorDevice.children["MPES"]:
+                if "MPES" not in self.device_models_by_mirror[mirror_name]:
+                    self.device_models_by_mirror[mirror_name]["MPES"] = {}
+                self.device_models_by_mirror[mirror_name]["MPES"][mpesChild.id] = mpesChild
 
     # Function to recursively traverse node tree
     def __traverse_node(self, node, parent_model):

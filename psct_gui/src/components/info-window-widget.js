@@ -1,5 +1,6 @@
 import { html } from '@polymer/lit-element'
 
+import { getErrorDescFromName, getErrorNumFromName, getErrorSeverityFromName } from '../utilities.js'
 import { PaperFontStyles } from './shared-styles.js'
 import { WidgetCard } from './widget-card.js'
 import { BaseSocketioDeviceClient } from '../socketio-device-client.js'
@@ -18,7 +19,6 @@ class InfoWindowWidget extends WidgetCard {
   constructor () {
     super()
     this.name = 'Info'
-    this.showName = false
 
     this._dialogOpen = false
 
@@ -32,18 +32,18 @@ class InfoWindowWidget extends WidgetCard {
     this.deviceMethods = []
 
     this.dataRequest = {
-        component_name: this.name,
-        fields: {
-            all: {
-                data: "all",
-                errors: "all",
-                methods: "all"
-            }
-        },
-        device_ids: []
+      component_name: this.name,
+      fields: {
+        All: {
+          data: 'All',
+          errors: 'All',
+          methods: 'All'
+        }
+      },
+      device_ids: []
     }
 
-    this.deviceToRequest = {id: null, type: ""}
+    this.deviceToRequest = { deviceID: null, deviceType: '' }
 
     this.socketioClient = new BaseSocketioDeviceClient('http://localhost:5000', this)
     this.socketioClient.connect()
@@ -51,7 +51,7 @@ class InfoWindowWidget extends WidgetCard {
   }
 
   static get properties () {
-    var properties = super.properties
+    let properties = super.properties
     Object.assign(properties, {
       deviceID: { type: String },
       deviceName: { type: String },
@@ -92,7 +92,7 @@ class InfoWindowWidget extends WidgetCard {
       }
       #call-method-button {
         color: black;
-        background-color: #white;
+        background-color: white;
         width: 125px;
       }
       .info-header {
@@ -123,7 +123,7 @@ class InfoWindowWidget extends WidgetCard {
       }
       </style>
 
-      ${this.deviceID === null || this.deviceID === "null"
+      ${this.deviceID === null || this.deviceID === 'null'
     ? html`
     <div class="info-header paper-font-display1">Device Not Found</div>
       <div class="status-display">
@@ -137,7 +137,7 @@ class InfoWindowWidget extends WidgetCard {
       <div class="info-body">
         <div class="paper-font-body2">No data. Device is not found in server.</div>
       </div>`
-     : html`
+    : html`
       <div class="info-header paper-font-display1">${this.deviceName}</div>
       <div class="status-display">
       <div class="paper-font-headline" style="display:inline-block;">${this.deviceType}</div>
@@ -194,7 +194,7 @@ class InfoWindowWidget extends WidgetCard {
           </template>
         </vaadin-grid>
       </div>`
-    }
+}
     <vaadin-dialog id="call-method-dialog" ?opened="${this._dialogOpen}" @opened-changed="${this._onDialogOpenChanged}" no-close-on-outside-click>
         <template id="method-dialog-content">
           <div class="paper-font-headline">Call a method.</div>
@@ -225,7 +225,7 @@ class InfoWindowWidget extends WidgetCard {
   }
 
   // Polymer lifecycle methods
-  updated () {
+  updated (_changedProperties) {
     // Disable stop button if the device doesn't have a stop method
     if (!this.deviceMethods.find(device => device.name === 'stop')) {
       this.shadowRoot.querySelector('#method-dialog-content').content.querySelector('#stop-button').disabled = true
@@ -238,10 +238,9 @@ class InfoWindowWidget extends WidgetCard {
 
   openDialog () {
     if (this.deviceID !== null && this.deviceID !== 'null') {
-        this._dialogOpen = true
-    }
-    else {
-        this.shadowRoot.getElementById('deviceNotFoundToast').open()
+      this._dialogOpen = true
+    } else {
+      this.shadowRoot.getElementById('deviceNotFoundToast').open()
     }
   }
   closeDialog () {
@@ -254,13 +253,8 @@ class InfoWindowWidget extends WidgetCard {
   }
 
   refresh () {
-    if (this.deviceID !== null && this.deviceID !== 'null') {
       this.socketioClient.requestData(this.dataRequest)
       this.loading = true
-    }
-    else {
-        this.shadowRoot.getElementById('deviceNotFoundToast').open()
-    }
   }
 
   methodSelected () {
@@ -289,54 +283,26 @@ class InfoWindowWidget extends WidgetCard {
   get deviceID () { return this._deviceID }
 
   set deviceToRequest (device) {
-    if (device.id !== null && device.id !== 'null') {
-      this._deviceID = device.id
-      this.dataRequest.device_ids = { [device.type]: [device.id] }
+    if (device.deviceID !== null && device.deviceID !== 'null') {
+      this._deviceID = device.deviceID
+      this.dataRequest.device_ids = { [device.deviceType]: [device.deviceID] }
       this.refresh()
-    }
-    else {
+    } else {
       this.dataRequest.device_ids = []
     }
   }
 
-  getErrorNumFromName (error_name) {
-      var pattern = /\[[0-9]+\]/ // extract pattern of "[errorNum]" from the error name string
-      var error_num = error_name.match(pattern)[0]
-      error_num = parseInt(error_num.substring(1, error_num.length-1)) // strip leading and trailing "[} and "]" and convert to int
-      return error_num
-  }
-
-  getErrorSeverityFromName (error_name) {
-      var pattern = /\[[a-zA-Z]+\]/ // extract pattern of "[severity]" from the error name string
-      var severity = error_name.match(pattern)[0]
-      severity = severity.substring(1, severity.length-1)
-      var severityCode = null
-      if (severity === "Operable") {
-         severityCode = 1
-      }
-      else if (severity === "Fatal") {
-         severityCode = 2
-      }
-      return [severityCode, severity]
-  }
-
-  getErrorDescFromName (error_name) {
-      var description = error_name.split("]")[2]
-      return description
-  }
-  
   _onRequestedData (data) {
     console.log(data)
-    var device = null
+    let device = null
     if (Object.keys(data).length === 0) {
-        this.deviceToRequest = {id: null, type: ""}
-        this.loading = false
-        return
-  }
+      this.loading = false
+      return
+    }
 
-    for (var deviceType in data) {
+    for (let deviceType in data) {
       if (data.hasOwnProperty(deviceType)) {
-        for (var deviceId in data[deviceType]) {
+        for (let deviceId in data[deviceType]) {
           if (data[deviceType].hasOwnProperty(deviceId)) {
             device = data[deviceType][deviceId]
           }
@@ -344,18 +310,16 @@ class InfoWindowWidget extends WidgetCard {
       }
     }
 
-    var dataFields = []
-    for (var d in device.data) {
+    let dataFields = []
+    for (let d in device.data) {
       if (device.data.hasOwnProperty(d)) {
-        var formattedOutput;
+        let formattedOutput
         if (typeof device.data[d] === 'string') {
-            formattedOutput = device.data[d]
-        }
-        else if (Number.isInteger(device.data[d])) {
-            formattedOutput = device.data[d];
-        }
-        else {
-            formattedOutput = device.data[d].toFixed(6);
+          formattedOutput = device.data[d]
+        } else if (Number.isInteger(device.data[d])) {
+          formattedOutput = device.data[d]
+        } else {
+          formattedOutput = device.data[d].toFixed(6)
         }
         dataFields.push({
           name: d,
@@ -364,21 +328,21 @@ class InfoWindowWidget extends WidgetCard {
       }
     }
 
-    var errorFields = []
-    for (var e in device.errors) {
+    let errorFields = []
+    for (let e in device.errors) {
       if (device.errors.hasOwnProperty(e) && device.errors[e]) {
         errorFields.push({
-          errorCode: this.getErrorNumFromName(e),
-          severity: this.getErrorSeverityFromName(e)[1],
-          severityIndex: this.getErrorSeverityFromName(e)[0],
+          errorCode: getErrorNumFromName(e),
+          severity: getErrorSeverityFromName(e)[1],
+          severityIndex: getErrorSeverityFromName(e)[0],
           timeString: (new Date()).toISOString(),
-          description: this.getErrorDescFromName(e)
+          description: getErrorDescFromName(e)
         })
       }
     }
 
-    this.deviceName = device.name.replace(/_/g, " ")
-    this.deviceType = device.type
+    this.deviceName = device.deviceName.replace(/_/g, ' ')
+    this.deviceType = device.deviceType
     this.deviceState = device.data.State
     this.deviceErrorState = device.data.ErrorState
     this.deviceData = dataFields
@@ -388,7 +352,5 @@ class InfoWindowWidget extends WidgetCard {
     this.loading = false
   }
 }
-
-
 
 window.customElements.define('info-window-widget', InfoWindowWidget)

@@ -36,7 +36,7 @@ app-drawer {
   overflow: auto;
 }
 .view-content {
-  margin-left: 10 px
+  margin-left: 10px;
 }
 [hidden] {
   display: none !important;

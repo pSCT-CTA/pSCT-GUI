@@ -30,7 +30,7 @@ setup(
     install_requires=[
           'opcua>=0.98.5',
           'eventlet>=0.24.1',
-          'python_socketio>=2.0.0'
+          'python_socketio>=2.0.0', 'socketio'
      ],
     extras_require={
         'testing': tests_require,

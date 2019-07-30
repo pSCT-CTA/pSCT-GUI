@@ -24,3 +24,4 @@ node_modules/
 *.sqlite
 npm_debug.log
 *_bak
+.idea/

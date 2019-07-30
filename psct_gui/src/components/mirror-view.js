@@ -11,7 +11,7 @@ class MirrorView extends PageViewElement {
   constructor () {
     super()
     // At startup, no device selected
-    this.selectedDeviceInfo = {id: null, type:""}
+    this.selectedDeviceInfo = { id: null, type: '' }
   }
 
   render () {
@@ -48,7 +48,7 @@ class MirrorView extends PageViewElement {
     `
   }
 
-  _onChangedSelectedDevice(e){
+  _onChangedSelectedDevice (e) {
     this.selectedDeviceInfo = e.detail
   }
 

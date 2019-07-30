@@ -28,13 +28,11 @@ class DeviceTreeWidget extends WidgetCard {
     this.dataRequest = {
         component_name: this.name,
         fields: {
-            all: {
-                data: ["ErrorState", "State"],
-                errors: [],
-                methods: []
+            All: {
+                data: ["ErrorState", "State"]
             }
         },
-        device_ids: "all"
+        device_ids: "All"
     }
 
     this.socketioClient = new BaseSocketioDeviceClient('http://localhost:5000', this)
@@ -190,7 +188,7 @@ class DeviceTreeWidget extends WidgetCard {
     var item = this.grid.activeItem
     if (item !== null && item.isDevice === true) {
       this.grid.selectedItems = item ? [item] : []
-      var event = new CustomEvent('changed-selected-device', { detail: {'type': item.deviceType, 'id': item.deviceID }})
+      var event = new CustomEvent('changed-selected-device', { detail: {'deviceType': item.deviceType, 'deviceID': item.deviceID }})
       this.dispatchEvent(event)
     }
   }
@@ -226,24 +224,24 @@ class DeviceTreeWidget extends WidgetCard {
                       isDevice: true,
                       hasChildren: (Object.keys(device.children).length > 0),
                       isFolder: (Object.keys(device.children).length > 0),
-                      name: device.name.replace(/_/g, " "),
+                      name: device.deviceName.replace(/_/g, " "),
                       deviceState: device.data.State,
                       errorState: device.data.ErrorState,
-                      deviceID: device.id,
-                      deviceType: device.type,
+                      deviceID: device.deviceID,
+                      deviceType: device.deviceType,
                       parentDeviceIDs_tree: [],
-                      parentDeviceIDs_flat: [device.type]
+                      parentDeviceIDs_flat: [device.deviceType]
                     }
 
                     for (var i = 0; i < device.parents.length; i++) {
                       // If not already present, create a tree folder for each child type for each device
-                      var folderID = device.parents[i] + '_' + device.type
+                      var folderID = device.parents[i] + '_' + device.deviceType
                       if (!_allItemsbyID.hasOwnProperty(folderID)) {
                         var folder = {
                           isDevice: false,
                           hasChildren: true,
                           isFolder: true,
-                          name: device.type,
+                          name: device.deviceType,
                           deviceID: folderID,
                           parentDeviceIDs_tree: [device.parents[i]],
                           parentDeviceIDs_flat: [device.parents[i]]
@@ -251,20 +249,20 @@ class DeviceTreeWidget extends WidgetCard {
                         _devices.push(folder)
                         _allItemsbyID[folderID] = folder
                       }
-                      deviceTreeObject.parentDeviceIDs_tree.push(device.parents[i] + '_' + device.type)
-                      deviceTreeObject.parentDeviceIDs_flat.push(device.parents[i] + '_' + device.type)
+                      deviceTreeObject.parentDeviceIDs_tree.push(device.parents[i] + '_' + device.deviceType)
+                      deviceTreeObject.parentDeviceIDs_flat.push(device.parents[i] + '_' + device.deviceType)
                     }
                     _devices.push(deviceTreeObject)
-                    _allItemsbyID[device.id] = deviceTreeObject
+                    _allItemsbyID[device.deviceID] = deviceTreeObject
 
-                    if (!_deviceTypeFolders.find(x => x.name === device.type)) {
+                    if (!_deviceTypeFolders.find(x => x.name === device.deviceType)) {
                       // Create top-level folder tree objects for use in "Flat" view mode
                       var deviceTypeFolder = {
                         isDevice: false,
                         hasChildren: true,
                         isFolder: true,
-                        name: device.type,
-                        deviceID: device.type
+                        name: device.deviceType,
+                        deviceID: device.deviceType
                       }
                       _deviceTypeFolders.push(deviceTypeFolder)
                       _allItemsbyID[deviceTypeFolder.deviceID] = deviceTypeFolder

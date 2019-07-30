@@ -2,7 +2,6 @@
 from abc import abstractmethod
 import logging
 import threading
-import pprint
 import opcua
 
 from psct_gui_backend.device_models import BaseDeviceModel
@@ -98,19 +97,6 @@ class OPCUADeviceModel(BaseDeviceModel):
 
     Attributes
     ----------
-    DEVICE_TYPE_NAME : str
-        Name of this device type (for printing and dictionary lookup).
-    TYPE_NODE_ID : str
-        OPC UA node id for the type node corresponding to this device type.
-    FOLDER_TYPE_NODE_ID : str
-        Node ID of OPC UA folder type node.
-    ERROR_NODE_BROWSE_NAME : str
-        Browse name of the folder node under each device which contains the
-        error nodes.
-    DEFAULT_DATA_SUBSCRIPTION_PUBLISH_INTERVAL : int
-        Default subscription publish interval for data nodes (in ms).
-    DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL : int
-        Default subscription publish interval for error nodes (in ms).
 
     """
 
@@ -161,7 +147,7 @@ class OPCUADeviceModel(BaseDeviceModel):
             self._obj_node.get_properties() + self._obj_node.get_variables())
 
         # NOTE: Requires that node display names for all properties
-        # and variables are unique within each devicege
+        # and variables are unique within each device
         self._data_nodes = {}
         for node in _data_nodes:
             if node.get_display_name().to_string() == "Position":
@@ -173,7 +159,6 @@ class OPCUADeviceModel(BaseDeviceModel):
 
         # TEMPORARY: Try-catch to allow instantiation even if errors not
         # implemented
-        error_folder = self._obj_node.get_child(["2:Errors"])
         _error_nodes = self._obj_node.get_child(
             ["2:Errors"]).get_children()
         self._error_nodes = {node.get_display_name().to_string(): node
@@ -294,6 +279,8 @@ class OPCUADeviceModel(BaseDeviceModel):
             elif n == 'errors':
                 DEFAULT_SUBSCRIPTION_PERIOD = (
                     OPCUADeviceModel.DEFAULT_ERROR_SUBSCRIPTION_PUBLISH_INTERVAL)
+            else:
+                raise ValueError("Invalid data type found for subscription.")
 
             for node_name in node_dict:
                 # If node is provided in sub_periods, use provided custom
@@ -417,14 +404,11 @@ class MirrorModel(OPCUADeviceModel):
 
     Attributes
     ----------
-    MIRROR_TYPE_NODE_NAME: str
-        Browse name for the node containing the mirror type.
 
     """
 
     DEVICE_TYPE_NAME = "Mirror"
     TYPE_NODE_ID = "ns=2;i=100"
-    MIRROR_TYPE_NODE_NAME = ''
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods=None):
@@ -435,8 +419,8 @@ class MirrorModel(OPCUADeviceModel):
 
         try:
             self.mirror_type = self._obj_node.get_child(
-                [MirrorModel.MIRROR_TYPE_NODE_NAME]).get_value()
-        except Exception:
+                ["2:Position"]).get_value()
+        except:
             self.mirror_type = None
 
 
@@ -445,9 +429,6 @@ class PanelModel(OPCUADeviceModel):
 
     Attributes
     ----------
-    PANEL_NUMBER_NODE_NAME: str
-        Browse name for the node containing the panel position number.
-
     """
 
     DEVICE_TYPE_NAME = "Panel"
@@ -460,6 +441,7 @@ class PanelModel(OPCUADeviceModel):
                          socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
+        self.adjacent_panels = []
         self.panel_number = str(self.position)
 
         if self.panel_number[0] == '0':
@@ -477,6 +459,9 @@ class PanelModel(OPCUADeviceModel):
             elif self.panel_number[0] == '3':
                 self.mirror = 'test'
                 mirror_identifier = 'P'
+            else:
+                raise ValueError("Panel with invalid mirror (first digit) found")
+
             self.ring_number = self.panel_number[2]
             if self.ring_number == '1':
                 self.ring = 'inner'
@@ -499,7 +484,6 @@ class PanelModel(OPCUADeviceModel):
         distinct from this panel.
 
         """
-        self.adjacent_panels = []
         for edge_model in self.edges:
             for panel in edge_model.panels:
                 if panel != self:

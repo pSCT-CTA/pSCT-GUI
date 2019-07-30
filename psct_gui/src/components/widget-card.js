@@ -75,7 +75,7 @@ export class WidgetCard extends LitElement {
     }
   }
 
-  _onRefreshButtonClicked (e) {
+  _onRefreshButtonClicked () {
     this.refresh()
   }
 
