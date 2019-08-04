@@ -80,14 +80,11 @@ export class WidgetCard extends LitElement {
   }
 
   _onFullscreenButtonClicked (e) {
-    /**
     if (!this.fullscreen) {
       this.fullscreen = true
-    }
-    else {
+    } else {
       this.fullscreen = false
     }
-    */
   }
 
   static get properties () {

@@ -773,20 +773,24 @@ class MirrorWidget extends WidgetCard {
           case 'MPES':
             return 'Total Misalignment: ' + (((d.data.xCentroidAvg - d.data.xCentroidNominal) ** 2 + (d.data.xCentroidAvg - d.data.xCentroidNominal) ** 2) ** 0.5).toFixed(4)
           case 'Edge': {
+            let numMPES = 0
             let misalignment = 0.0
-            for (let mpesId in d.children.MPES) {
-              const mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
+            d.children.MPES.forEach(function (mpesId, index) {
+              let mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
               misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2) ** 0.5
-            }
-            return 'Total Edge Misalignment: ' + misalignment.toFixed(4)
+              numMPES += 1
+            }.bind(this))
+            return 'Average Edge Misalignment: ' + (misalignment / numMPES).toFixed(4)
           }
           case 'Panel': {
+            let numMPES = 0
             let misalignment = 0.0
-            for (let mpesId in d.children.MPES) {
-              const mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
+            d.children.MPES.forEach(function (mpesId, index) {
+              let mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
               misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2) ** 0.5
-            }
-            return 'Total Panel Misalignment: ' + misalignment.toFixed(4)
+              numMPES += 1
+            }.bind(this))
+            return 'Average Panel Misalignment: ' + (misalignment / numMPES).toFixed(4)
           }
           default:
             return ''
@@ -857,21 +861,21 @@ class MirrorWidget extends WidgetCard {
           case 'Edge': {
             let numMPES = 0
             let misalignment = 0.0
-            for (let mpesId in d.children.MPES) {
+            d.children.MPES.forEach(function (mpesId, index) {
               let mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
               misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2) ** 0.5
               numMPES += 1
-            }
+            }.bind(this))
             return this.alignmentColorScale(misalignment / numMPES)
           }
           case 'Panel':
             let numMPES = 0
             let misalignment = 0.0
-            for (let mpesId in d.children.MPES) {
+            d.children.MPES.forEach(function (mpesId, index) {
               let mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
               misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2) ** 0.5
               numMPES += 1
-            }
+            }.bind(this))
             return this.alignmentColorScale(misalignment / numMPES)
           default:
             return 'white'
@@ -1158,7 +1162,7 @@ class MirrorWidget extends WidgetCard {
         .enter()
         .append('text')
         .attr('x', size + size * 1.2)
-        .attr('y', function (d, i) { return  (this.SVG_HEIGHT / 3) + i * (size + 5) + (size / 2) }.bind(this)) // 100 is where the first dot appears. 25 is the distance between dots
+        .attr('y', function (d, i) { return (this.SVG_HEIGHT / 3) + i * (size + 5) + (size / 2) }.bind(this)) // 100 is where the first dot appears. 25 is the distance between dots
         .style('fill', function (d) { return 'black' })
         .text(function (d) { return d })
         .attr('text-anchor', 'left')
@@ -1224,6 +1228,11 @@ class MirrorWidget extends WidgetCard {
     this.initialized = false
     this.dataRequest['device_ids'] = this.mirror
     this.refresh()
+  }
+
+  _selectMirror (e) {
+    let mirrorDevice = this.currentObjectData['Mirror']
+    this._onClickDevice(mirrorDevice)
   }
 
   _onClickDevice (data) {

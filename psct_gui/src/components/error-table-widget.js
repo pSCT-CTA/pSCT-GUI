@@ -53,7 +53,7 @@ class ErrorTableWidget extends WidgetCard {
     ${PaperFontStyles}
     <style>
       #error-grid {
-        height: 200px;
+        min-height: 200px;
       }
     </style>
     <vaadin-grid items="${JSON.stringify(Array.from(this.errors.values()))}" id="error-grid" @click="${this._onItemClick}">

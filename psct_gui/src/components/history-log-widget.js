@@ -59,7 +59,7 @@ class HistoryLogWidget extends WidgetCard {
     ${PaperFontStyles}
     <style>
       #history-grid {
-        height: 200px;
+         min-height: 200px;
       }
     </style>
     <vaadin-grid items="${JSON.stringify(this.historyEvents)}" id="history-grid">

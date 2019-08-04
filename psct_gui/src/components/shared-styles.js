@@ -363,11 +363,15 @@ export const WidgetStyles = html`
     transition: width 0.5s, height 0.5s;
   }
   paper-card.fullscreen {
-    z-index: -1;
+    z-index: 10000;
     position: fixed;
     width: 100%;
-    top: 0;
+    top: 64px;
     left: 0;
+    height: 100%;
+  }
+  paper-card > card-content {
+    height: 90%;
   }
   .card-actions > .custom-actions {
     float: left;
