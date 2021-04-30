@@ -25,7 +25,7 @@ class MirrorWidget extends WidgetCard {
     this.SVG_HEIGHT = 0
 
     this.initialized = false
-    this.socketioClient = new BaseSocketioDeviceClient('http://localhost:5000', this)
+    this.socketioClient = new BaseSocketioDeviceClient('http://172.17.10.15:5000', this)
     this.socketioClient.connect()
 
     // Hardcoded properties
@@ -677,7 +677,7 @@ class MirrorWidget extends WidgetCard {
 
   computeColorScales () {
     this.temperatureColorScale = d3.scaleSequential(d3.interpolateRdYlBu)
-      .domain([35.0, 15.0])
+      .domain([35.0, -10.0])
 
     this.alignmentColorScale = d3.scaleSequential(d3.interpolateRdYlGn)
       .domain([60.0, 0.0])
@@ -689,7 +689,7 @@ class MirrorWidget extends WidgetCard {
       .domain([0.0, 5000.0])
 
     this.MPESIntensityScale = d3.scaleSequential(d3.interpolateOranges)
-      .domain([0.0, 200000.0])
+      .domain([0.0, 500000.0])
 
     this.ActuatorLengthScale = d3.scaleSequential(d3.interpolatePuOr)
       .domain([410.0, 480.0])
@@ -834,7 +834,7 @@ class MirrorWidget extends WidgetCard {
       } else if (this.viewMode === 'Z Displacement') {
         switch (d.deviceType) {
           case 'Panel':
-            return this.ActuatorLengthScale(d.data.z)
+            return this.zColorScale(d.data.z)
           default:
             return 'white'
         }
@@ -855,7 +855,7 @@ class MirrorWidget extends WidgetCard {
       } else if (this.viewMode === 'Alignment Overview') {
         switch (d.deviceType) {
           case 'MPES': {
-            let misalignment = (((d.data.xCentroidAvg - d.data.xCentroidNominal) ** 2 + (d.data.xCentroidAvg - d.data.xCentroidNominal) ** 2) ** 0.5)
+            let misalignment = (((d.data.xCentroidAvg - d.data.xCentroidNominal) ** 2 + (d.data.yCentroidAvg - d.data.yCentroidNominal) ** 2) ** 0.5)
             return this.alignmentColorScale(misalignment)
           }
           case 'Edge': {
@@ -863,20 +863,20 @@ class MirrorWidget extends WidgetCard {
             let misalignment = 0.0
             d.children.MPES.forEach(function (mpesId, index) {
               let mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
-              misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2) ** 0.5
+              misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.yCentroidAvg - mpesObject.data.yCentroidNominal) ** 2) ** 0.5
               numMPES += 1
             }.bind(this))
-            return this.alignmentColorScale(misalignment / numMPES)
+            return this.alignmentColorScale(misalignment / (numMPES+0.0000001))
           }
           case 'Panel':
             let numMPES = 0
             let misalignment = 0.0
             d.children.MPES.forEach(function (mpesId, index) {
               let mpesObject = this.currentObjectData.MPES.find(x => x.deviceID === mpesId)
-              misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2) ** 0.5
+              misalignment += ((mpesObject.data.xCentroidAvg - mpesObject.data.xCentroidNominal) ** 2 + (mpesObject.data.yCentroidAvg - mpesObject.data.yCentroidNominal) ** 2) ** 0.5
               numMPES += 1
             }.bind(this))
-            return this.alignmentColorScale(misalignment / numMPES)
+            return this.alignmentColorScale(misalignment / (numMPES+0.0000001))
           default:
             return 'white'
         }

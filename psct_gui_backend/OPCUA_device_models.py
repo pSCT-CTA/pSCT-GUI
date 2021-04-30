@@ -348,8 +348,7 @@ class OPCUADeviceModel(BaseDeviceModel):
             if method_name in self.methods:
                 self._busy = True
                 thread = threading.Thread(
-                    target=self._call_method,
-                    args=(method_name, *args))
+                    target=self._call_method, args=(method_name, args)) 
                 thread.start()
             else:
                 logger.error("Method name {} not found in device {}.".format(
@@ -467,6 +466,8 @@ class PanelModel(OPCUADeviceModel):
                 self.ring = 'inner'
             elif self.ring_number == '2':
                 self.ring = 'outer'
+            elif self.ring_number == '0':
+                self.ring = 'OT'
 
             self.panel_type = mirror_identifier + self.ring_number
 
@@ -549,20 +550,96 @@ class MPESModel(OPCUADeviceModel):
                          socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
+class CCDModel(OPCUADeviceModel):
+    """Model class for a global alignment system CCD device."""
 
-class GASSystemModel(OPCUADeviceModel):
-    """Model class for a global alignment system device."""
-
-    DEVICE_TYPE_NAME = "GAS_system"
-    TYPE_NODE_ID = "placeholder_gas"
+    DEVICE_TYPE_NAME = "CCD"
+    TYPE_NODE_ID = "ns=2;i=3100"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods=None):
-        """Instantiate a PositionerModel instance."""
+        """Instantiate a CCDModel instance."""
         super().__init__(obj_node, opcua_client,
                          socketio_server=socketio_server,
                          sub_periods=sub_periods)
 
+class GlobalAlignmentModel(OPCUADeviceModel):
+    """Model class for a GlobalAlignment system device."""
+
+    DEVICE_TYPE_NAME = "GlobalAlignment"
+    TYPE_NODE_ID = "ns=2;i=3400"
+
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
+                 sub_periods=None):
+        """Instantiate a GlobalAlignmentModel instance."""
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
+                         sub_periods=sub_periods)
+
+class OpticalAlignmentModel(OPCUADeviceModel):
+    """Model class for a OpticalAlignment device."""
+
+    DEVICE_TYPE_NAME = "OpticalAlignment"
+    TYPE_NODE_ID = "ns=2;i=3500"
+
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
+                 sub_periods=None):
+        """Instantiate a OpticalAlignmentModel instance."""
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
+                         sub_periods=sub_periods)
+
+class FocalPlaneModel(OPCUADeviceModel):
+    """Model class for a FocalPlane device."""
+
+    DEVICE_TYPE_NAME = "FocalPlane"
+    TYPE_NODE_ID = "ns=2;i=3300"
+
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
+                 sub_periods=None):
+        """Instantiate a FocalPlaneModel instance."""
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
+                         sub_periods=sub_periods)
+
+class PSDModel(OPCUADeviceModel):
+    """Model class for a PSD device."""
+
+    DEVICE_TYPE_NAME = "PSD"
+    TYPE_NODE_ID = "ns=2;i=3200"
+
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
+                 sub_periods=None):
+        """Instantiate a PSDModel instance."""
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
+                         sub_periods=sub_periods)
+
+class LaserModel(OPCUADeviceModel):
+    """Model class for a Laser device."""
+
+    DEVICE_TYPE_NAME = "Laser"
+    TYPE_NODE_ID = "ns=2;i=3600"
+
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
+                 sub_periods=None):
+        """Instantiate a LaserModel instance."""
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
+                         sub_periods=sub_periods)
+
+class RangefinderModel(OPCUADeviceModel):
+    """Model class for a Rangefinder device."""
+
+    DEVICE_TYPE_NAME = "Rangefinder"
+    TYPE_NODE_ID = "ns=2;i=3700"
+
+    def __init__(self, obj_node, opcua_client, socketio_server=None,
+                 sub_periods=None):
+        """Instantiate a RangefinderModel instance."""
+        super().__init__(obj_node, opcua_client,
+                         socketio_server=socketio_server,
+                         sub_periods=sub_periods)
 
 class PointingSystemModel(OPCUADeviceModel):
     """Model class for a telescope pointing system device."""
@@ -582,7 +659,7 @@ class PositionerModel(OPCUADeviceModel):
     """Model class for a telescope positioner device."""
 
     DEVICE_TYPE_NAME = "Positioner"
-    TYPE_NODE_ID = "placeholder_positioner"
+    TYPE_NODE_ID = "ns=2;i=0"
 
     def __init__(self, obj_node, opcua_client, socketio_server=None,
                  sub_periods=None):

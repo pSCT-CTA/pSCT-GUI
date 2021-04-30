@@ -13,7 +13,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-opcua_client = opcua.Client("opc.tcp://10.0.1.13:48010", timeout=60)
+opcua_client = opcua.Client("opc.tcp://172.17.10.15:48010", timeout=60)
 sio = socketio.Server()
 
 serv = BackendServer(opcua_client, sio)

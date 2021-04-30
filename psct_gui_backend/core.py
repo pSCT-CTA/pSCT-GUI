@@ -50,7 +50,9 @@ class BackendServer(object):
         self.device_models_by_mirror = {
             "primary": {},
             "secondary": {},
-            "test": {}
+            "test": {},
+            "Laser": {},
+            "Rangefinder": {}
         }
 
         @self.sio.on('connect')
@@ -108,6 +110,8 @@ class BackendServer(object):
             device_ids = {device_type: "Secondary" for device_type in self.device_models_by_type.keys()}
         elif device_ids == "Test":
             device_ids = {device_type: "Test" for device_type in self.device_models_by_type.keys()}
+        else:
+            logger.warn("device_ids not found")
 
         for device_type in device_ids:
             fields_to_retrieve = {
@@ -125,6 +129,8 @@ class BackendServer(object):
                     device_ids[device_type] = list(self.device_models_by_mirror["secondary"][device_type].keys())
                 elif device_ids[device_type] == "Test":
                     device_ids[device_type] = list(self.device_models_by_mirror["test"][device_type].keys())
+                else:
+                    logger.warn("device_type not found")
 
                 example_object = self.device_models_by_type[device_type][device_ids[device_type][0]]
 
@@ -368,10 +374,10 @@ if __name__ == "__main__":
 
     logger.info("Starting OPC UA client for address {}".format(args.opcua_server_address))
     opcua_client = opcua.Client(args.opcua_server_address, timeout=300)
-    sio = socketio.Server(async_mode='eventlet', ping_timeout=300, ping_interval=300, allow_upgrades=True)
+    sio = socketio.Server(async_mode='eventlet', ping_timeout=300, ping_interval=300, allow_upgrades=True, cors_allowed_origins="*")
 
     serv = BackendServer(opcua_client, sio)
     serv.initialize_device_models("2:DeviceTree")
     
     app = socketio.WSGIApp(sio)
-    eventlet.wsgi.server(eventlet.listen(('', 5000)), app)
+    eventlet.wsgi.server(eventlet.listen(('172.17.10.15', 5000)), app)

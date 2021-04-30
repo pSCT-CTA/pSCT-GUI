@@ -35,7 +35,7 @@ class DeviceTreeWidget extends WidgetCard {
         device_ids: "All"
     }
 
-    this.socketioClient = new BaseSocketioDeviceClient('http://localhost:5000', this)
+    this.socketioClient = new BaseSocketioDeviceClient('http://172.17.10.15:5000', this)
     this.socketioClient.connect()
     this.socketioClient.requestData(this.dataRequest)
   }
